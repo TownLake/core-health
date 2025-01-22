@@ -2,40 +2,111 @@ name: Collect Withings Data
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # Run at 10 AM UTC daily
+    - cron: '0 10 * * *'
   workflow_dispatch:
     inputs:
-      start_date:
-        description: 'Start date (YYYY-MM-DD)'
+      target_date:
+        description: 'Target date (YYYY-MM-DD format)'
         required: false
-      end_date:
-        description: 'End date (YYYY-MM-DD)'
-        required: false
+        default: ''
 
 jobs:
   collect-data:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-          
-      - name: Run collection script
-        env:
-          WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
-          WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
-          WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          CF_NAMESPACE_ID: ${{ secrets.CF_NAMESPACE_ID }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          INPUT_START_DATE: ${{ github.event.inputs.start_date }}
-          INPUT_END_DATE: ${{ github.event.inputs.end_date }}
-        run: python withings_collector.py
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Create data collection script
+      run: |
+        mkdir -p scripts
+        cat > scripts/withings_collector.py << 'EOL'
+        import os
+        import sys
+        import json
+        import time
+        from datetime import datetime
+        import requests
+
+        def get_withings_token():
+            token_url = "https://wbsapi.withings.net/v2/oauth2"
+            data = {
+                "action": "requesttoken",
+                "client_id": os.environ["WITHINGS_CLIENT_ID"],
+                "client_secret": os.environ["WITHINGS_CLIENT_SECRET"],
+                "grant_type": "refresh_token",
+                "refresh_token": os.environ["WITHINGS_REFRESH_TOKEN"]
+            }
+            response = requests.post(token_url, data=data)
+            response.raise_for_status()
+            return response.json()["body"]["access_token"]
+
+        def get_withings_data(token, target_date=None):
+            if target_date:
+                start_date = int(datetime.strptime(target_date, "%Y-%m-%d").timestamp())
+            else:
+                start_date = int(time.time()) - 86400
+            end_date = start_date + 86400
+            
+            url = "https://wbsapi.withings.net/measure"
+            headers = {"Authorization": f"Bearer {token}"}
+            data = {
+                "action": "getmeas",
+                "meastypes": "1,6",
+                "startdate": start_date,
+                "enddate": end_date
+            }
+            response = requests.post(url, headers=headers, data=data)
+            response.raise_for_status()
+            return response.json()["body"]["measuregrps"]
+
+        def process_measurements(measures):
+            processed_data = {}
+            for group in measures:
+                date = datetime.fromtimestamp(group["date"]).strftime("%Y-%m-%d")
+                if date not in processed_data:
+                    processed_data[date] = {"weight": None, "fat_ratio": None}
+                for measure in group["measures"]:
+                    if measure["type"] == 1:
+                        processed_data[date]["weight"] = measure["value"] * (10 ** measure["unit"])
+                    elif measure["type"] == 6:
+                        processed_data[date]["fat_ratio"] = measure["value"] * (10 ** measure["unit"])
+            return processed_data
+
+        def main():
+            target_date = sys.argv[1] if len(sys.argv) > 1 else None
+            token = get_withings_token()
+            measurements = get_withings_data(token, target_date)
+            data = process_measurements(measurements)
+            print(json.dumps(data))
+
+        if __name__ == "__main__":
+            main()
+        EOL
+
+    - name: Install Wrangler
+      run: npm install -g wrangler
+        
+    - name: Configure Wrangler
+      run: |
+        echo "CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}" >> $GITHUB_ENV
+        echo "CLOUDFLARE_ACCOUNT_ID=${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" >> $GITHUB_ENV
+    
+    - name: Run data collection and store in KV
+      env:
+        WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
+        WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
+        WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
+      run: |
+        DATA=$(python scripts/withings_collector.py ${{ github.event.inputs.target_date }})
+        echo "$DATA" | wrangler kv:key put --binding=WITHINGS_DATA "withings_data" -
