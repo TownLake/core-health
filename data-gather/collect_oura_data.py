@@ -75,6 +75,7 @@ def find_relevant_sleep_session(data, target_date):
     print(f"Found {len(items)} sleep sessions")
     for item in items:
         print(f"Sleep session: date={item.get('day')}, start={item.get('bedtime_start')}, end={item.get('bedtime_end')}")
+    print("Raw sleep info:", json.dumps(items, indent=2))
     
     if not items:
         print(f"No sleep sessions found for {target_date}")
@@ -142,9 +143,9 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
             
         existing_data[date_key] = data
 
-        print("Writing updated data to temporary file...")
+        sorted_data = dict(sorted(existing_data.items()))
         with open('temp_oura_data.json', 'w') as f:
-            json.dump(existing_data, f)
+            json.dump(sorted_data, f)
 
         print("Storing in Workers KV...")
         with open('temp_oura_data.json', 'r') as f:
@@ -212,7 +213,7 @@ def main(target_date=None):
             'date': sleep_info.get('day'),
             'sleep': {
                 'deep_sleep_minutes': round(sleep_info.get('deep_sleep_duration', 0) / 60),
-                'sleep_score': sleep_info.get('sleep_score'),
+                'sleep_score': sleep_info.get('score'),
                 'bedtime_start_date': format_time_components(sleep_info.get('bedtime_start'))[0],
                 'bedtime_start_time': format_time_components(sleep_info.get('bedtime_start'))[1],
                 'total_sleep': minutes_to_hhmm(round(sleep_info.get('total_sleep_duration', 0) / 60)),
