@@ -2,7 +2,7 @@ import requests
 import json
 import os
 import subprocess
-from datetime import datetime, date, timedelta, UTC  # Added UTC import
+from datetime import datetime, date, timedelta, UTC
 
 class OuraDataFetcher:
     def __init__(self, token):
@@ -79,15 +79,29 @@ def store_in_workers_kv(namespace_id, data):
     """Store data in Workers KV using wrangler."""
     try:
         print("Getting existing data from Workers KV...")
-        result = subprocess.run(
+        # First, check if wrangler is properly configured
+        wrangler_check = subprocess.run(['wrangler', '--version'], capture_output=True, text=True)
+        print(f"Wrangler version: {wrangler_check.stdout.strip()}")
+        
+        # Try to get existing data
+        get_result = subprocess.run(
             ['wrangler', 'kv:key', 'get', '--namespace-id', namespace_id, 'oura_data'],
             capture_output=True,
             text=True
         )
         
-        if result.returncode == 0 and result.stdout:
-            existing_data = json.loads(result.stdout)
-            print("Successfully retrieved existing data")
+        print(f"Get command stdout: {get_result.stdout}")
+        print(f"Get command stderr: {get_result.stderr}")
+        print(f"Get command return code: {get_result.returncode}")
+
+        if get_result.returncode == 0 and get_result.stdout.strip():
+            try:
+                existing_data = json.loads(get_result.stdout)
+                print("Successfully parsed existing data")
+            except json.JSONDecodeError as e:
+                print(f"Error parsing existing data: {e}")
+                print(f"Raw data received: {get_result.stdout[:200]}...")  # Print first 200 chars
+                existing_data = {}
         else:
             print("No existing data found, starting fresh")
             existing_data = {}
@@ -103,31 +117,40 @@ def store_in_workers_kv(namespace_id, data):
 
         # Store in Workers KV
         print("Storing in Workers KV...")
+        
+        # Read the file content
         with open('temp_oura_data.json', 'r') as f:
-            data_content = f.read()
-            
-        result = subprocess.run(
+            file_content = f.read()
+            print(f"File content length: {len(file_content)} characters")
+            print(f"First 100 characters of content: {file_content[:100]}...")
+
+        # Store using wrangler
+        put_result = subprocess.run(
             ['wrangler', 'kv:key', 'put',
              '--namespace-id', namespace_id,
-             'oura_data', data_content],
+             'oura_data', file_content],
             capture_output=True,
             text=True
         )
 
-        if result.stderr:
-            print(f"Warning - stderr output: {result.stderr}")
+        print(f"Put command stdout: {put_result.stdout}")
+        print(f"Put command stderr: {put_result.stderr}")
+        print(f"Put command return code: {put_result.returncode}")
 
         # Clean up
         os.remove('temp_oura_data.json')
         
-        if result.returncode != 0:
-            raise Exception(f"Wrangler command failed with return code {result.returncode}")
+        if put_result.returncode != 0:
+            raise Exception(f"Wrangler command failed with return code {put_result.returncode}")
             
         print("Successfully stored data in Workers KV")
         return True
 
     except Exception as e:
         print(f"Error storing data in Workers KV: {str(e)}")
+        print(f"Exception type: {type(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return False
 
 def main():
@@ -136,6 +159,8 @@ def main():
         
         token = os.environ['OURA_TOKEN']
         namespace_id = os.environ['WORKERS_KV_NAMESPACE_ID']
+
+        print(f"Using namespace ID: {namespace_id}")
 
         fetcher = OuraDataFetcher(token)
         _, _, target_date = fetcher.get_date_range()
@@ -168,7 +193,7 @@ def main():
                 'cardio_age': cardio_info.get('vascular_age')
             },
             'metadata': {
-                'collected_at': datetime.now(UTC).isoformat()  # Updated to use timezone-aware datetime
+                'collected_at': datetime.now(UTC).isoformat()
             }
         }
 
@@ -181,6 +206,8 @@ def main():
 
     except Exception as e:
         print(f"Error: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         raise e
 
 if __name__ == "__main__":
