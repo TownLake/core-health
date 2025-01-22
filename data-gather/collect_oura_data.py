@@ -18,7 +18,6 @@ class OuraDataFetcher:
         elif isinstance(target_date, str):
             target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
             
-        # Look at 2 days before and 1 day after to catch all relevant sleep sessions
         start_date = (target_date - timedelta(days=2)).strftime('%Y-%m-%d')
         end_date = (target_date + timedelta(days=1)).strftime('%Y-%m-%d')
         return start_date, end_date, target_date.strftime('%Y-%m-%d')
@@ -32,7 +31,15 @@ class OuraDataFetcher:
         }
         response = requests.get(url, headers=self.headers, params=params)
         response.raise_for_status()
-        return response.json()
+        sleep_data = response.json()
+        
+        # Fetch daily sleep scores
+        url = f'{self.base_url}/daily_sleep'
+        response = requests.get(url, headers=self.headers, params=params)
+        response.raise_for_status()
+        daily_sleep_data = response.json()
+        
+        return sleep_data, daily_sleep_data
         
     def fetch_cardio_age(self):
         _, _, target_date = self.get_date_range()
@@ -197,12 +204,17 @@ def main(target_date=None):
         _, _, date_key = fetcher.get_date_range(target_date)
 
         print("Fetching data from Oura API...")
-        sleep_data = fetcher.fetch_sleep_data()
+        sleep_data, daily_sleep_data = fetcher.fetch_sleep_data()
         cardio_data = fetcher.fetch_cardio_age()
         spo2_data = fetcher.fetch_spo2()
 
         print("Processing data...")
         sleep_info = find_relevant_sleep_session(sleep_data, target_date)
+        
+        # Get sleep score from daily_sleep endpoint
+        daily_sleep_scores = {item['day']: item['score'] for item in daily_sleep_data.get('data', [])}
+        sleep_score = daily_sleep_scores.get(target_date)
+        
         cardio_info = cardio_data.get('data', [{}])[0]
         spo2_info = spo2_data.get('data', [{}])[0]
 
@@ -213,7 +225,7 @@ def main(target_date=None):
             'date': sleep_info.get('day'),
             'sleep': {
                 'deep_sleep_minutes': round(sleep_info.get('deep_sleep_duration', 0) / 60),
-                'sleep_score': sleep_info.get('score'),
+                'sleep_score': sleep_score,
                 'bedtime_start_date': format_time_components(sleep_info.get('bedtime_start'))[0],
                 'bedtime_start_time': format_time_components(sleep_info.get('bedtime_start'))[1],
                 'total_sleep': minutes_to_hhmm(round(sleep_info.get('total_sleep_duration', 0) / 60)),
