@@ -12,8 +12,12 @@ class OuraDataFetcher:
         }
         self.base_url = 'https://api.ouraring.com/v2/usercollection'
         
-    def get_date_range(self):
-        target_date = date.today()
+    def get_date_range(self, target_date=None):
+        if target_date is None:
+            target_date = date.today()
+        elif isinstance(target_date, str):
+            target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
+            
         start_date = (target_date - timedelta(days=1)).strftime('%Y-%m-%d')
         end_date = (target_date + timedelta(days=1)).strftime('%Y-%m-%d')
         return start_date, end_date, target_date.strftime('%Y-%m-%d')
@@ -75,8 +79,14 @@ def find_relevant_sleep_session(data, target_date):
     
     return {}
 
-def store_in_workers_kv(namespace_id, data):
-    """Store data in Workers KV using wrangler."""
+def store_in_workers_kv(namespace_id, data, date_key=None):
+    """Store data in Workers KV using wrangler.
+    
+    Args:
+        namespace_id (str): The Workers KV namespace ID
+        data (dict): The data to store
+        date_key (str, optional): The date key to use. If None, uses today's date.
+    """
     try:
         print("Getting existing data from Workers KV...")
         # First, check if wrangler is properly configured
@@ -107,8 +117,23 @@ def store_in_workers_kv(namespace_id, data):
             existing_data = {}
 
         # Update with new data
-        today = date.today().strftime('%Y-%m-%d')
-        existing_data[today] = data
+        date_key = date_key or date.today().strftime('%Y-%m-%d')
+        
+        if date_key in existing_data:
+            print(f"Warning: Data already exists for {date_key}")
+            print("Existing data:", json.dumps(existing_data[date_key], indent=2))
+            print("New data:", json.dumps(data, indent=2))
+            # Merge the data, preferring new values only for non-None fields
+            merged_data = existing_data[date_key].copy()
+            for category in ['sleep', 'health']:
+                if category in data and category in merged_data:
+                    for key, value in data[category].items():
+                        if value is not None:
+                            merged_data[category][key] = value
+            data = merged_data
+            print("Merged data:", json.dumps(data, indent=2))
+            
+        existing_data[date_key] = data
 
         # Write to temporary file
         print("Writing updated data to temporary file...")
@@ -153,9 +178,9 @@ def store_in_workers_kv(namespace_id, data):
         print(f"Traceback: {traceback.format_exc()}")
         return False
 
-def main():
+def main(target_date=None):
     try:
-        print("Starting Oura data collection...")
+        print(f"Starting Oura data collection for date: {target_date or 'today'}...")
         
         token = os.environ['OURA_TOKEN']
         namespace_id = os.environ['WORKERS_KV_NAMESPACE_ID']
@@ -163,7 +188,7 @@ def main():
         print(f"Using namespace ID: {namespace_id}")
 
         fetcher = OuraDataFetcher(token)
-        _, _, target_date = fetcher.get_date_range()
+        _, _, date_key = fetcher.get_date_range(target_date)
 
         print("Fetching data from Oura API...")
         sleep_data = fetcher.fetch_sleep_data()
@@ -198,7 +223,7 @@ def main():
         }
 
         print("Storing data...")
-        success = store_in_workers_kv(namespace_id, daily_data)
+        success = store_in_workers_kv(namespace_id, daily_data, date_key)
         if not success:
             raise Exception("Failed to store data in Workers KV")
 

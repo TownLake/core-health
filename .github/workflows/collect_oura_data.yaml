@@ -3,7 +3,12 @@ name: Collect Oura Ring Data
 on:
   schedule:
     - cron: '0 9 * * *'  # Runs at 9 AM UTC daily
-  workflow_dispatch:      # Allows manual triggering
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Target date (YYYY-MM-DD format)'
+        required: false
+        default: ''
   
 jobs:
   collect-data:
@@ -35,4 +40,4 @@ jobs:
       env:
         OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
         WORKERS_KV_NAMESPACE_ID: ${{ secrets.WORKERS_KV_NAMESPACE_ID }}
-      run: python data-gather/collect_oura_data.py
+      run: python data-gather/collect_oura_data.py ${{ github.event.inputs.target_date }}
