@@ -18,7 +18,8 @@ class OuraDataFetcher:
         elif isinstance(target_date, str):
             target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
             
-        start_date = target_date.strftime('%Y-%m-%d')
+        # Look at 2 days before and 1 day after to catch all relevant sleep sessions
+        start_date = (target_date - timedelta(days=2)).strftime('%Y-%m-%d')
         end_date = (target_date + timedelta(days=1)).strftime('%Y-%m-%d')
         return start_date, end_date, target_date.strftime('%Y-%m-%d')
         
@@ -131,12 +132,11 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
             print(f"Warning: Data already exists for {date_key}")
             print("Existing data:", json.dumps(existing_data[date_key], indent=2))
             print("New data:", json.dumps(data, indent=2))
-            merged_data = existing_data[date_key].copy()
-            for category in ['sleep', 'health']:
-                if category in data and category in merged_data:
-                    for key, value in data[category].items():
-                        if value is not None:
-                            merged_data[category][key] = value
+            merged_data = {}
+            for category in ['sleep', 'health', 'metadata']:
+                if category in data:
+                    merged_data[category] = data[category]
+            merged_data['date'] = data.get('date')
             data = merged_data
             print("Merged data:", json.dumps(data, indent=2))
             
