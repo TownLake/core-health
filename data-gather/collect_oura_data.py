@@ -183,8 +183,16 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
         return False
 
 def main(target_date=None):
+    """
+    Args:
+        target_date (str): Optional date in YYYY-MM-DD format
+    """
     try:
         print(f"Starting Oura data collection for date: {target_date or 'today'}...")
+        if target_date is None:
+            target_date = date.today().strftime('%Y-%m-%d')
+            
+        print(f"Using formatted date: {target_date}")
         
         token = os.environ['OURA_TOKEN']
         namespace_id = os.environ['WORKERS_KV_NAMESPACE_ID']
@@ -240,4 +248,6 @@ def main(target_date=None):
         raise e
 
 if __name__ == "__main__":
-    main()
+    import sys
+    target_date = sys.argv[1] if len(sys.argv) > 1 else None
+    main(target_date)
