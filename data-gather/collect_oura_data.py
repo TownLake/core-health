@@ -18,7 +18,7 @@ class OuraDataFetcher:
         elif isinstance(target_date, str):
             target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
             
-        start_date = (target_date - timedelta(days=1)).strftime('%Y-%m-%d')
+        start_date = target_date.strftime('%Y-%m-%d')
         end_date = (target_date + timedelta(days=1)).strftime('%Y-%m-%d')
         return start_date, end_date, target_date.strftime('%Y-%m-%d')
         
@@ -55,6 +55,19 @@ class OuraDataFetcher:
         response.raise_for_status()
         return response.json()
 
+def format_time_components(datetime_str):
+    if not datetime_str:
+        return None, None
+    dt = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+    return dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
+
+def minutes_to_hhmm(minutes):
+    if not minutes:
+        return None
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+    return f"{hours:02d}:{remaining_minutes:02d}"
+
 def find_relevant_sleep_session(data, target_date):
     """Find the most relevant sleep session for the target date."""
     items = data.get('data', [])
@@ -84,20 +97,12 @@ def find_relevant_sleep_session(data, target_date):
     return {}
 
 def store_in_workers_kv(namespace_id, data, date_key=None):
-    """Store data in Workers KV using wrangler.
-    
-    Args:
-        namespace_id (str): The Workers KV namespace ID
-        data (dict): The data to store
-        date_key (str, optional): The date key to use. If None, uses today's date.
-    """
+    """Store data in Workers KV using wrangler."""
     try:
         print("Getting existing data from Workers KV...")
-        # First, check if wrangler is properly configured
         wrangler_check = subprocess.run(['wrangler', '--version'], capture_output=True, text=True)
         print(f"Wrangler version: {wrangler_check.stdout.strip()}")
         
-        # Try to get existing data
         get_result = subprocess.run(
             ['wrangler', 'kv:key', 'get', '--namespace-id', namespace_id, 'oura_data'],
             capture_output=True,
@@ -114,20 +119,18 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
                 print("Successfully parsed existing data")
             except json.JSONDecodeError as e:
                 print(f"Error parsing existing data: {e}")
-                print(f"Raw data received: {get_result.stdout[:200]}...")  # Print first 200 chars
+                print(f"Raw data received: {get_result.stdout[:200]}...")
                 existing_data = {}
         else:
             print("No existing data found, starting fresh")
             existing_data = {}
 
-        # Update with new data
         date_key = date_key or date.today().strftime('%Y-%m-%d')
         
         if date_key in existing_data:
             print(f"Warning: Data already exists for {date_key}")
             print("Existing data:", json.dumps(existing_data[date_key], indent=2))
             print("New data:", json.dumps(data, indent=2))
-            # Merge the data, preferring new values only for non-None fields
             merged_data = existing_data[date_key].copy()
             for category in ['sleep', 'health']:
                 if category in data and category in merged_data:
@@ -139,21 +142,16 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
             
         existing_data[date_key] = data
 
-        # Write to temporary file
         print("Writing updated data to temporary file...")
         with open('temp_oura_data.json', 'w') as f:
             json.dump(existing_data, f)
 
-        # Store in Workers KV
         print("Storing in Workers KV...")
-        
-        # Read the file content
         with open('temp_oura_data.json', 'r') as f:
             file_content = f.read()
             print(f"File content length: {len(file_content)} characters")
             print(f"First 100 characters of content: {file_content[:100]}...")
 
-        # Store using wrangler
         put_result = subprocess.run(
             ['wrangler', 'kv:key', 'put',
              '--namespace-id', namespace_id,
@@ -166,7 +164,6 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
         print(f"Put command stderr: {put_result.stderr}")
         print(f"Put command return code: {put_result.returncode}")
 
-        # Clean up
         os.remove('temp_oura_data.json')
         
         if put_result.returncode != 0:
@@ -183,10 +180,6 @@ def store_in_workers_kv(namespace_id, data, date_key=None):
         return False
 
 def main(target_date=None):
-    """
-    Args:
-        target_date (str): Optional date in YYYY-MM-DD format
-    """
     try:
         print(f"Starting Oura data collection for date: {target_date or 'today'}...")
         if target_date is None:
@@ -220,8 +213,9 @@ def main(target_date=None):
             'sleep': {
                 'deep_sleep_minutes': round(sleep_info.get('deep_sleep_duration', 0) / 60),
                 'sleep_score': sleep_info.get('sleep_score'),
-                'bedtime_start': sleep_info.get('bedtime_start'),
-                'total_sleep_minutes': round(sleep_info.get('total_sleep_duration', 0) / 60),
+                'bedtime_start_date': format_time_components(sleep_info.get('bedtime_start'))[0],
+                'bedtime_start_time': format_time_components(sleep_info.get('bedtime_start'))[1],
+                'total_sleep': minutes_to_hhmm(round(sleep_info.get('total_sleep_duration', 0) / 60)),
                 'resting_heart_rate': sleep_info.get('lowest_heart_rate'),
                 'average_hrv': sleep_info.get('average_hrv')
             },
