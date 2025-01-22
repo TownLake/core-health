@@ -58,6 +58,10 @@ class OuraDataFetcher:
 def find_relevant_sleep_session(data, target_date):
     """Find the most relevant sleep session for the target date."""
     items = data.get('data', [])
+    print(f"Found {len(items)} sleep sessions")
+    for item in items:
+        print(f"Sleep session: date={item.get('day')}, start={item.get('bedtime_start')}, end={item.get('bedtime_end')}")
+    
     if not items:
         print(f"No sleep sessions found for {target_date}")
         return {}
@@ -70,7 +74,7 @@ def find_relevant_sleep_session(data, target_date):
     
     target_sessions = [
         item for item in items 
-        if item.get('bedtime_end', '').startswith(target_date)
+        if item.get('bedtime_end') and str(item.get('bedtime_end')).startswith(target_date)
     ]
     
     if target_sessions:
