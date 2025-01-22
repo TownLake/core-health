@@ -38,6 +38,13 @@ jobs:
         from datetime import datetime
         import requests
 
+        def validate_env():
+            required = ['WITHINGS_CLIENT_ID', 'WITHINGS_CLIENT_SECRET', 'WITHINGS_REFRESH_TOKEN']
+            missing = [var for var in required if not os.getenv(var)]
+            if missing:
+                print(f"Missing environment variables: {', '.join(missing)}", file=sys.stderr)
+                sys.exit(1)
+
         def get_withings_token():
             token_url = "https://wbsapi.withings.net/v2/oauth2"
             data = {
@@ -47,10 +54,23 @@ jobs:
                 "grant_type": "refresh_token",
                 "refresh_token": os.environ["WITHINGS_REFRESH_TOKEN"]
             }
-            response = requests.post(token_url, data=data)
-            response.raise_for_status()
-            result = response.json()
-            return result["body"]["access_token"]
+            try:
+                response = requests.post(token_url, data=data)
+                response.raise_for_status()
+                result = response.json()
+                print(f"Token response: {json.dumps(result)}", file=sys.stderr)
+                if 'error' in result:
+                    print(f"Error in token response: {result['error']}", file=sys.stderr)
+                    sys.exit(1)
+                if 'body' not in result or 'access_token' not in result['body']:
+                    print(f"Invalid token response format: {result}", file=sys.stderr)
+                    sys.exit(1)
+                return result["body"]["access_token"]
+            except Exception as e:
+                print(f"Token request failed: {e}", file=sys.stderr)
+                if hasattr(response, 'text'):
+                    print(f"Response content: {response.text}", file=sys.stderr)
+                sys.exit(1)
 
         def get_withings_data(token, target_date=None):
             if target_date:
@@ -85,6 +105,7 @@ jobs:
             return processed_data
 
         def main():
+            validate_env()
             target_date = sys.argv[1] if len(sys.argv) > 1 else None
             token = get_withings_token()
             measurements = get_withings_data(token, target_date)
@@ -109,5 +130,9 @@ jobs:
         WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
         WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
       run: |
+        if [ -z "$WITHINGS_REFRESH_TOKEN" ]; then
+          echo "Error: WITHINGS_REFRESH_TOKEN is not set"
+          exit 1
+        fi
         DATA=$(python scripts/withings_collector.py ${{ github.event.inputs.target_date }})
         echo "$DATA" | wrangler kv:key put --namespace-id ${{ secrets.CLOUDFLARE_KV_WITHINGS }} withings_data -
