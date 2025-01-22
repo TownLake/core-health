@@ -49,7 +49,8 @@ jobs:
             }
             response = requests.post(token_url, data=data)
             response.raise_for_status()
-            return response.json()["body"]["access_token"]
+            result = response.json()
+            return result["body"]["access_token"]
 
         def get_withings_data(token, target_date=None):
             if target_date:
@@ -109,4 +110,4 @@ jobs:
         WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
       run: |
         DATA=$(python scripts/withings_collector.py ${{ github.event.inputs.target_date }})
-        echo "$DATA" | wrangler kv:key put --binding=WITHINGS_DATA "withings_data" -
+        echo "$DATA" | wrangler kv:key put --namespace-id ${{ secrets.CLOUDFLARE_KV_WITHINGS }} withings_data -
