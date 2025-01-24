@@ -1,40 +1,34 @@
-name: Collect Oura Data
+name: Pull Oura Data
 
 on:
   schedule:
-    - cron: '0 9 * * *' # Trigger daily at 9 AM UTC
+    - cron: "0 9 * * *" # Runs every day at 9 AM
   workflow_dispatch:
     inputs:
       date:
-        description: 'Enter the date for which to fetch data (YYYY-MM-DD)'
+        description: "Date to pull data for (YYYY-MM-DD)"
         required: false
-        default: ''
 
 jobs:
-  collect_oura_data:
+  pull-oura-data:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: "3.9"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests  # No need for sqlite3 installation
+        run: pip install requests cloudflare-python
 
-      - name: Run data collection script
-        run: |
-          if [ -n "${{ github.event.inputs.date }}" ]; then
-            python data-gather/collect_oura_data.py --date ${{ github.event.inputs.date }}
-          else
-            python data-gather/collect_oura_data.py
-          fi
+      - name: Pull Oura data
         env:
+          OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
+        run: |
+          python data-gather/collect_oura_data.py ${{ github.event.inputs.date || '' }}
