@@ -34,7 +34,7 @@ jobs:
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.date }}" != "" ]; then
-          python data-gather/collect-oura-data.py "${{ github.event.inputs.date }}"
+          python data-gather/collect_oura_data.py "${{ github.event.inputs.date }}"
         else
-          python data-gather/collect-oura-data.py
+          python data-gather/collect_oura_data.py
         fi
