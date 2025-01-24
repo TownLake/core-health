@@ -119,25 +119,36 @@ class CloudflareD1:
             logger.warning("No data to insert")
             return False
 
+        # D1 expects flattened data
+        flattened_data = {
+            'date': data['date'],
+            'deep_sleep_minutes': data['sleep']['deep_sleep_minutes'],
+            'sleep_score': data['sleep']['sleep_score'],
+            'bedtime_start_date': data['sleep']['bedtime_start_date'],
+            'bedtime_start_time': data['sleep']['bedtime_start_time'],
+            'total_sleep': data['sleep']['total_sleep'],
+            'resting_heart_rate': data['sleep']['resting_heart_rate'],
+            'average_hrv': data['sleep']['average_hrv'],
+            'spo2_avg': data['health']['spo2_avg'],
+            'cardio_age': data['health']['cardio_age'],
+            'collected_at': data['metadata']['collected_at']
+        }
+
         # Construct SQL query with parameterized values
-        placeholders = ', '.join(['?'] * len(data))
-        columns = ', '.join(data.keys())
+        columns = ', '.join(flattened_data.keys())
+        placeholders = ', '.join(['?'] * len(flattened_data))
         
-        query = f"""
-            INSERT INTO oura_data ({columns})
-            VALUES ({placeholders})
-        """
+        query = f"INSERT INTO oura_data ({columns}) VALUES ({placeholders})"
         
         logger.info(f"Executing query with columns: {columns}")
-        logger.debug(f"Query parameters: {list(data.values())}")
+        logger.debug(f"Query parameters: {list(flattened_data.values())}")
 
         try:
-            # Use the standard D1 query endpoint
             response = requests.post(
-                f'{self.base_url}/sam_health_data/query',
+                f'{self.base_url}/sam_health_data/query', 
                 headers=self.headers,
                 json={
-                    'params': list(data.values()),
+                    'params': list(flattened_data.values()), 
                     'sql': query
                 }
             )
