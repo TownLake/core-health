@@ -82,8 +82,17 @@ class OuraClient:
         total_sleep_score = target_sleep.get('contributors', {}).get('total_sleep')
 
         # Extract metrics from readiness response
+        # Extract metrics from readiness response
         hrv = target_readiness.get('contributors', {}).get('hrv_balance')
         resting_hr = target_readiness.get('contributors', {}).get('resting_heart_rate')
+
+        # Check hrv/hr from sleep data if readiness doesn't have it
+        if hrv is None:
+            hrv = target_sleep.get('contributors', {}).get('hrv_balance')
+        if resting_hr is None:
+            resting_hr = target_sleep.get('contributors', {}).get('resting_heart_rate')
+            
+        logger.info(f"Using HRV: {hrv}, Resting HR: {resting_hr}")
 
         # Compile metrics
         daily_data = {
@@ -117,8 +126,17 @@ class CloudflareD1:
             'Authorization': f'Bearer {api_token}',
             'Content-Type': 'application/json'
         }
-        self.base_url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database'
+        # Get database ID first
+        base_api = 'https://api.cloudflare.com/client/v4'
+        self.base_url = f'{base_api}/accounts/{account_id}/d1/database'
         logger.info("Initialized Cloudflare D1 client")
+        
+        # Test connection
+        try:
+            response = requests.get(f'{base_api}/accounts/{account_id}', headers=self.headers)
+            logger.info(f"Cloudflare auth test response: {response.text}")
+        except Exception as e:
+            logger.error(f"Error testing Cloudflare connection: {str(e)}")
 
     def insert_data(self, data):
         if not data:
