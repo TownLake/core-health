@@ -34,7 +34,6 @@ class OuraDataFetcher:
         response.raise_for_status()
         sleep_data = response.json()
         
-        # Also fetch daily sleep scores
         url = f'{self.base_url}/daily_sleep'
         response = requests.get(url, headers=self.headers, params=params)
         response.raise_for_status()
@@ -83,21 +82,30 @@ def find_relevant_sleep_session(data, target_date):
     for item in items:
         print(f" - date={item.get('day')}, start={item.get('bedtime_start')}, end={item.get('bedtime_end')}")
     
-    if not items:
-        print(f"No sleep sessions found near {target_date}")
-        return {}
-        
+    # First try exact date match
     target_sessions = [item for item in items if item.get('day') == target_date]
     if target_sessions:
         return max(target_sessions, key=lambda x: x.get('total_sleep_duration', 0))
     
+    # Then try bedtime_end that falls on target date
     target_sessions = [
         item for item in items
-        if item.get('bedtime_end') and str(item.get('bedtime_end')).startswith(target_date)
+        if item.get('bedtime_end') and item.get('bedtime_end').startswith(target_date)
     ]
     if target_sessions:
         return max(target_sessions, key=lambda x: x.get('total_sleep_duration', 0))
     
+    # Finally, try bedtime_start from previous day
+    target_sessions = [
+        item for item in items
+        if item.get('bedtime_start') and 
+        (datetime.fromisoformat(item.get('bedtime_start').replace('Z', '+00:00')).date() + 
+         timedelta(days=1)).strftime('%Y-%m-%d') == target_date
+    ]
+    if target_sessions:
+        return max(target_sessions, key=lambda x: x.get('total_sleep_duration', 0))
+    
+    print(f"No sleep sessions found for {target_date}")
     return {}
 
 def store_in_d1_columns(d1_db_name, data_dict, date_key):
@@ -120,7 +128,7 @@ def store_in_d1_columns(d1_db_name, data_dict, date_key):
     cardio_age = data_dict["health"]["cardio_age"]
     collected = data_dict["metadata"]["collected_at"]
     
-    table_name = "oura_data"  # Explicit table name
+    table_name = "oura_data"
     upsert_sql = f"""
     INSERT INTO {table_name} (
       date, deep_sleep_minutes, sleep_score,
@@ -147,6 +155,15 @@ def store_in_d1_columns(d1_db_name, data_dict, date_key):
     print("Running UPSERT SQL:\n", upsert_sql)
     
     try:
+        # Test database connectivity first
+        test_proc = subprocess.run(
+            ["wrangler", "d1", "execute", d1_db_name, "--command", "SELECT 1;"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        print("D1 connectivity test:", test_proc.stdout)
+        
         upsert_proc = subprocess.run(
             ["wrangler", "d1", "execute", d1_db_name, "--command", upsert_sql],
             capture_output=True,
@@ -154,10 +171,14 @@ def store_in_d1_columns(d1_db_name, data_dict, date_key):
             check=True
         )
         print("D1 UPSERT stdout:", upsert_proc.stdout)
-        print("D1 UPSERT stderr:", upsert_proc.stderr)
+        if upsert_proc.stderr:
+            print("D1 UPSERT stderr:", upsert_proc.stderr)
         return True
     except subprocess.CalledProcessError as e:
-        print("Error inserting/updating data in D1:", e)
+        print("Error executing D1 command:")
+        print("Exit code:", e.returncode)
+        print("stdout:", e.stdout)
+        print("stderr:", e.stderr)
         return False
 
 def main(target_date=None):
@@ -170,6 +191,10 @@ def main(target_date=None):
         d1_db_name = os.environ.get('CLOUDFLARE_D1_DB')
         if not d1_db_name:
             raise ValueError("CLOUDFLARE_D1_DB environment variable is not set.")
+            
+        print(f"Using D1 database: {d1_db_name}")
+        print(f"Cloudflare Account ID set: {'CLOUDFLARE_ACCOUNT_ID' in os.environ}")
+        print(f"Cloudflare API Token set: {'CLOUDFLARE_API_TOKEN' in os.environ}")
         
         fetcher = OuraDataFetcher(token)
         _, _, date_key = fetcher.get_date_range(target_date)
