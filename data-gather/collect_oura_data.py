@@ -38,11 +38,18 @@ def fetch_oura_data(start_date, end_date):
         params={"start_date": start_date, "end_date": end_date}
     )
     sleep_details = response.json().get("data", [])
+    print("Raw sleep details response:", json.dumps(sleep_details, indent=2))  # Debug log
     if sleep_details:
         bedtime_entry = sleep_details[0]
         bedtime_start = bedtime_entry.get("bedtime_start", "")
-        results["bedtime_start_date"] = bedtime_start.split("T")[0]
-        results["bedtime_start_time"] = bedtime_start.split("T")[1] if "T" in bedtime_start else ""
+        if bedtime_start:
+            results["bedtime_start_date"] = bedtime_start.split("T")[0]  # Extract date
+            results["bedtime_start_time"] = bedtime_start.split("T")[1].split("Z")[0]  # Extract time
+        else:
+            results["bedtime_start_date"] = ""
+            results["bedtime_start_time"] = ""
+            print(f"Warning: bedtime_start missing for {start_date}")
+
         results["resting_heart_rate"] = bedtime_entry.get("lowest_heart_rate", 0)
         results["average_hrv"] = bedtime_entry.get("average_hrv", 0)
 
