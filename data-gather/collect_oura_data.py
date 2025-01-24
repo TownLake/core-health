@@ -111,7 +111,7 @@ class CloudflareD1:
             'Authorization': f'Bearer {api_token}',
             'Content-Type': 'application/json'
         }
-        self.base_url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/sam_health_data'
+        self.base_url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database'
         logger.info("Initialized Cloudflare D1 client")
 
     def insert_data(self, data):
@@ -132,12 +132,13 @@ class CloudflareD1:
         logger.debug(f"Query parameters: {list(data.values())}")
 
         try:
+            # Use the standard D1 query endpoint
             response = requests.post(
-                f'{self.base_url}/query',
+                f'{self.base_url}/sam_health_data/query',
                 headers=self.headers,
                 json={
-                    'sql': query,
-                    'params': list(data.values())
+                    'params': list(data.values()),
+                    'sql': query
                 }
             )
             response_data = response.json()
