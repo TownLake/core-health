@@ -148,7 +148,9 @@ def store_in_d1_columns(d1_db_name, data_dict, date_key):
         if val is None:
             return "NULL"
         if is_text:
-            return f"'{str(val).replace(\"'\", \"''\")}'"
+            # We'll build the quoted string carefully to avoid backslash issues
+            safe_val = str(val).replace("'", "''")
+            return "'" + safe_val + "'"
         return str(val)
     
     # Pull out the fields from data_dict
@@ -170,7 +172,7 @@ def store_in_d1_columns(d1_db_name, data_dict, date_key):
       bedtime_start_date, bedtime_start_time, total_sleep,
       resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at
     ) VALUES (
-      {sql_str(date_key, True)},       -- date is text
+      {sql_str(date_key, True)},       -- date is text (PK)
       {sql_str(deep_sleep)},           -- integer
       {sql_str(sleep_score)},          -- integer
       {sql_str(bed_start_date, True)}, -- text
