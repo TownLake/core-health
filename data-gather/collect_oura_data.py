@@ -1,128 +1,84 @@
 import os
-import sys
+import json
 import requests
 from datetime import datetime, timedelta
-import json
 
-# Constants
-OURA_BASE_URL = "https://api.ouraring.com/v2/usercollection"
-D1_API_URL = f"https://api.cloudflare.com/client/v4/accounts/{os.getenv('CLOUDFLARE_ACCOUNT_ID')}/d1/database/{os.getenv('D1_DATABASE')}/query"
-HEADERS = {
-    "Authorization": f"Bearer {os.getenv('CLOUDFLARE_API_TOKEN')}",
-    "Content-Type": "application/json"
-}
+CLOUDFLARE_ACCOUNT_ID = os.environ["CLOUDFLARE_ACCOUNT_ID"]
+CLOUDFLARE_API_TOKEN = os.environ["CLOUDFLARE_API_TOKEN"]
+OURA_TOKEN = os.environ["OURA_TOKEN"]
+DATABASE_ID = "5d45c3e0-e4e8-4ea9-8c74-99fc49693825"
 
-def fetch_oura_data(start_date, end_date):
-    headers = {"Authorization": f"Bearer {os.getenv('OURA_TOKEN')}"}
-    results = {}
+def get_target_date():
+    target_date = os.environ.get("TARGET_DATE")
+    if target_date:
+        return target_date
+    return (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # Fetch daily sleep
-    response = requests.get(
-        f"{OURA_BASE_URL}/daily_sleep",
-        headers=headers,
-        params={"start_date": start_date, "end_date": end_date}
-    )
-    sleep_data = response.json().get("data", [])
-    if not sleep_data:
-        print(f"No daily sleep data for the range {start_date} to {end_date}")
-        return {}
-    sleep_entry = sleep_data[0]
-    results["deep_sleep_minutes"] = sleep_entry.get("contributors", {}).get("deep_sleep", 0)
-    results["sleep_score"] = sleep_entry.get("score", 0)
-    results["total_sleep"] = sleep_entry.get("contributors", {}).get("total_sleep", 0)
+def fetch_oura_data(endpoint, date):
+    base_url = "https://api.ouraring.com/v2/usercollection"
+    headers = {"Authorization": f"Bearer {OURA_TOKEN}"}
+    params = {"start_date": date, "end_date": date}
+    
+    response = requests.get(f"{base_url}/{endpoint}", headers=headers, params=params)
+    response.raise_for_status()
+    return response.json()
 
-    # Fetch bedtime start
-    response = requests.get(
-        f"{OURA_BASE_URL}/sleep",
-        headers=headers,
-        params={"start_date": start_date, "end_date": end_date}
-    )
-    sleep_details = response.json().get("data", [])
-    print("Raw sleep details response:", json.dumps(sleep_details, indent=2))  # Debug log
-    if sleep_details:
-        bedtime_entry = sleep_details[0]
-        bedtime_start = bedtime_entry.get("bedtime_start", "")
-        print("Raw bedtime_start value:", bedtime_start)  # Print raw bedtime_start value
-        if bedtime_start:
-            results["bedtime_start_date"] = bedtime_start.split("T")[0]  # Extract date
-            results["bedtime_start_time"] = bedtime_start.split("T")[1].split("Z")[0]  # Extract time
-        else:
-            results["bedtime_start_date"] = None
-            results["bedtime_start_time"] = None
-            print(f"Warning: bedtime_start missing for {start_date}")
-
-        results["resting_heart_rate"] = bedtime_entry.get("lowest_heart_rate", 0)
-        results["average_hrv"] = bedtime_entry.get("average_hrv", 0)
-
-    # Fetch SpO2
-    response = requests.get(
-        f"{OURA_BASE_URL}/daily_spo2",
-        headers=headers,
-        params={"start_date": start_date, "end_date": end_date}
-    )
-    spo2_data = response.json().get("data", [])
-    if spo2_data:
-        results["spo2_avg"] = spo2_data[0].get("spo2_percentage", {}).get("average", 0)
-
-    # Fetch cardio age
-    response = requests.get(
-        f"{OURA_BASE_URL}/daily_cardiovascular_age",
-        headers=headers,
-        params={"start_date": start_date, "end_date": end_date}
-    )
-    cardio_data = response.json().get("data", [])
-    if cardio_data:
-        results["cardio_age"] = cardio_data[0].get("vascular_age", 0)
-
-    results["date"] = start_date
-    results["collected_at"] = datetime.utcnow().isoformat()
-    return results
-
-def upload_to_d1(data):
-    query = f"""
-    INSERT INTO oura_data (date, deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time, total_sleep, resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """
-    payload = {
-        "sql": query,
-        "params": [
-            data["date"],
-            data["deep_sleep_minutes"],
-            data["sleep_score"],
-            data.get("bedtime_start_date"),  # None maps to null
-            data.get("bedtime_start_time"),  # None maps to null
-            data["total_sleep"],
-            data.get("resting_heart_rate", 0),
-            data.get("average_hrv", 0),
-            data.get("spo2_avg", 0),
-            data.get("cardio_age", 0),
-            data.get("collected_at")  # None maps to null
-        ]
+def insert_into_d1(data):
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/d1/database/{DATABASE_ID}/query"
+    headers = {
+        "Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}",
+        "Content-Type": "application/json"
     }
+    
+    query = {
+        "sql": f"""INSERT INTO oura_data 
+                 (date, deep_sleep_minutes, sleep_score, bedtime_start_date, 
+                  bedtime_start_time, total_sleep, resting_heart_rate, 
+                  average_hrv, spo2_avg, cardio_age, collected_at) 
+                 VALUES 
+                 ('{data["date"]}', {data["deep_sleep_minutes"]}, {data["sleep_score"]},
+                  '{data["bedtime_start_date"]}', '{data["bedtime_start_time"]}',
+                  {data["total_sleep"]}, {data["resting_heart_rate"]}, {data["average_hrv"]},
+                  {data["spo2_avg"]}, {data["cardio_age"]}, '{datetime.now().isoformat()}')"""
+    }
+    
+    response = requests.post(url, headers=headers, json=query)
+    response.raise_for_status()
+    return response.json()
 
-    # Debugging payload
-    print("SQL Query:", query)
-    print("Payload:", json.dumps(payload, indent=2))
+def main():
+    target_date = get_target_date()
+    print(f"Collecting data for date: {target_date}")
+    
+    # Collect data from different endpoints
+    daily_sleep = fetch_oura_data("daily_sleep", target_date)["data"][0]
+    sleep = fetch_oura_data("sleep", target_date)["data"][0]
+    spo2 = fetch_oura_data("daily_spo2", target_date)["data"][0]
+    cardio = fetch_oura_data("daily_cardiovascular_age", target_date)["data"][0]
 
-    response = requests.post(D1_API_URL, headers=HEADERS, json=payload)
-    if response.status_code == 200:
-        print("Data uploaded successfully!")
-    else:
-        print("Error uploading data:", response.status_code, response.text)
-
+    # Parse bedtime
+    bedtime = datetime.fromisoformat(sleep["bedtime_start"].replace('Z', '+00:00'))
+    
+    # Prepare data for D1
+    data = {
+        "date": target_date,
+        "deep_sleep_minutes": daily_sleep["contributors"]["deep_sleep"],
+        "sleep_score": daily_sleep["score"],
+        "bedtime_start_date": bedtime.date().isoformat(),
+        "bedtime_start_time": bedtime.time().isoformat(),
+        "total_sleep": daily_sleep["contributors"]["total_sleep"],
+        "resting_heart_rate": sleep["lowest_heart_rate"],
+        "average_hrv": sleep["average_hrv"],
+        "spo2_avg": spo2["spo2_percentage"]["average"],
+        "cardio_age": cardio["vascular_age"]
+    }
+    
+    print("Collected data:")
+    print(json.dumps(data, indent=2))
+    
+    # Insert into D1
+    result = insert_into_d1(data)
+    print("D1 insertion result:", json.dumps(result, indent=2))
 
 if __name__ == "__main__":
-    input_date = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
-    if not input_date:
-        date = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
-    else:
-        date = input_date
-    try:
-        data = fetch_oura_data(date, date)
-        if data:
-            print("Fetched data:", json.dumps(data, indent=2))
-            upload_to_d1(data)
-        else:
-            print("No data to upload.")
-    except Exception as e:
-        print("Error:", str(e))
+    main()

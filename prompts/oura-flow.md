@@ -7,6 +7,7 @@ I would like to routinely pull Oura V2 API information, using a GitHub action th
 * generate the whole files (the workflow and .py file)
 * in the github action logs print out the data captured so we can see what it is trying to send to D1
 * the .py file is located at data-gather/collect_oura_data.py
+* the database ID is 5d45c3e0-e4e8-4ea9-8c74-99fc49693825
 
 ## SQL Column Names
 date (text) - primary key
@@ -14,7 +15,7 @@ deep_sleep_minutes (integer)
 sleep_score (integer)
 bedtime_start_date (text)
 bedtime_start_time (text)
-total_sleep (text)
+total_sleep (integer)
 resting_heart_rate (integer)
 average_hrv (integer)
 spo2_avg (real)
@@ -275,7 +276,7 @@ print(response.text)
 
 ### Total Sleep
 
-total_sleep (text) is "total_sleep" value below; see comment to confirm exact location
+total_sleep (integer) is "total_sleep" value below; see comment to confirm exact location
 
 #### Request Example
 
@@ -544,3 +545,28 @@ print(response.text)
   ],
   "next_token": "string"
 }
+
+## Structure of Cloudflare D1 Calls
+
+The following example works
+
+curl -X POST \
+     https://api.cloudflare.com/client/v4/accounts/account-ID/d1/database/db-id/query \
+     -H "Authorization: Bearer TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "sql": "INSERT INTO oura_data (date, deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time, total_sleep, resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+           "bindings": [
+             {"type": "text", "value": "2025-01-20"},
+             {"type": "integer", "value": 67},
+             {"type": "integer", "value": 84},
+             {"type": "text", "value": ""},
+             {"type": "text", "value": ""},
+             {"type": "integer", "value": 81},
+             {"type": "integer", "value": 0},
+             {"type": "integer", "value": 0},
+             {"type": "real", "value": 98.241},
+             {"type": "integer", "value": 0},
+             {"type": "text", "value": ""}
+           ]
+         }'
