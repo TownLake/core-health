@@ -89,14 +89,14 @@ def upload_to_d1(data):
             data["date"],
             data["deep_sleep_minutes"],
             data["sleep_score"],
-            data.get("bedtime_start_date"),
-            data.get("bedtime_start_time"),
+            data.get("bedtime_start_date"),  # None maps to null
+            data.get("bedtime_start_time"),  # None maps to null
             data["total_sleep"],
             data.get("resting_heart_rate", 0),
             data.get("average_hrv", 0),
             data.get("spo2_avg", 0),
             data.get("cardio_age", 0),
-            data["collected_at"]
+            data.get("collected_at")  # None maps to null
         ]
     }
 
@@ -109,6 +109,7 @@ def upload_to_d1(data):
         print("Data uploaded successfully!")
     else:
         print("Error uploading data:", response.status_code, response.text)
+
 
 if __name__ == "__main__":
     input_date = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
