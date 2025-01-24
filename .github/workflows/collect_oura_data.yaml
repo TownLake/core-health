@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests sqlite3
+          pip install requests  # No need for sqlite3 installation
 
       - name: Run data collection script
         run: |
