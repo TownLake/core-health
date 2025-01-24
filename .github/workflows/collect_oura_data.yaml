@@ -1,53 +1,40 @@
-name: Collect Oura Ring Data
+name: Collect Oura Data
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 9 * * *'  # Runs at 9 AM UTC daily
   workflow_dispatch:
     inputs:
       target_date:
-        description: 'Target date (YYYY-MM-DD format)'
+        description: 'Target date (YYYY-MM-DD)'
         required: false
-        default: ''
+        type: string
 
 jobs:
   collect-data:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Install Wrangler
-        run: npm install -g wrangler
-
-      - name: Configure Wrangler
-        run: |
-          cat > wrangler.toml << EOL
-          [[d1_databases]]
-          binding = "DB"
-          database_name = "sam_health_data"
-          database_id = "5d45c3e0-e4e8-4ea9-8c74-99fc49693825"
-          EOL
-
-      - name: Run Oura data collection
-        env:
-          OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_D1_DB: "sam_health_data"
-        run: |
-          if [ "${{ github.event.inputs.target_date }}" != "" ]; then
-            python data-gather/collect_oura_data.py "${{ github.event.inputs.target_date }}"
-          else
-            python data-gather/collect_oura_data.py
-          fi
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+        
+    - name: Run data collection script
+      env:
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.target_date }}" != "" ]; then
+          python oura_collector.py "${{ github.event.inputs.target_date }}"
+        else
+          python oura_collector.py
+        fi
