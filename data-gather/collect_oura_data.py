@@ -3,12 +3,14 @@ import sys
 import requests
 from datetime import datetime, timedelta
 import json
-from cloudflare import Cloudflare
 
 # Constants
 OURA_BASE_URL = "https://api.ouraring.com/v2/usercollection"
-D1_DATABASE = "sam_health_data"
-D1_TABLE = "oura_data"
+D1_API_URL = f"https://api.cloudflare.com/client/v4/accounts/{os.getenv('CLOUDFLARE_ACCOUNT_ID')}/d1/database/{os.getenv('D1_DATABASE')}/query"
+HEADERS = {
+    "Authorization": f"Bearer {os.getenv('CLOUDFLARE_API_TOKEN')}",
+    "Content-Type": "application/json"
+}
 
 def fetch_oura_data(start_date, end_date):
     headers = {"Authorization": f"Bearer {os.getenv('OURA_TOKEN')}"}
@@ -69,9 +71,8 @@ def fetch_oura_data(start_date, end_date):
     return results
 
 def upload_to_d1(data):
-    cf = Cloudflare(account_id=os.getenv("CLOUDFLARE_ACCOUNT_ID"), api_token=os.getenv("CLOUDFLARE_API_TOKEN"))
     query = f"""
-    INSERT INTO {D1_TABLE} (date, deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time, total_sleep, resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at)
+    INSERT INTO oura_data (date, deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time, total_sleep, resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (date) DO UPDATE SET
       deep_sleep_minutes = excluded.deep_sleep_minutes,
@@ -85,7 +86,28 @@ def upload_to_d1(data):
       cardio_age = excluded.cardio_age,
       collected_at = excluded.collected_at;
     """
-    cf.d1(D1_DATABASE).query(query, *data.values())
+    payload = {
+        "sql": query,
+        "bindings": [
+            {"type": "text", "value": data["date"]},
+            {"type": "integer", "value": data["deep_sleep_minutes"]},
+            {"type": "integer", "value": data["sleep_score"]},
+            {"type": "text", "value": data.get("bedtime_start_date", "")},
+            {"type": "text", "value": data.get("bedtime_start_time", "")},
+            {"type": "text", "value": data["total_sleep"]},
+            {"type": "integer", "value": data.get("resting_heart_rate", 0)},
+            {"type": "integer", "value": data.get("average_hrv", 0)},
+            {"type": "real", "value": data.get("spo2_avg", 0)},
+            {"type": "integer", "value": data.get("cardio_age", 0)},
+            {"type": "text", "value": data["collected_at"]}
+        ]
+    }
+
+    response = requests.post(D1_API_URL, headers=HEADERS, json=payload)
+    if response.status_code == 200:
+        print("Data uploaded successfully!")
+    else:
+        print("Error uploading data:", response.status_code, response.text)
 
 if __name__ == "__main__":
     input_date = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
@@ -98,7 +120,6 @@ if __name__ == "__main__":
         if data:
             print("Fetched data:", json.dumps(data, indent=2))
             upload_to_d1(data)
-            print("Data uploaded successfully!")
         else:
             print("No data to upload.")
     except Exception as e:
