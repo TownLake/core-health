@@ -42,6 +42,7 @@ def fetch_oura_data(start_date, end_date):
     if sleep_details:
         bedtime_entry = sleep_details[0]
         bedtime_start = bedtime_entry.get("bedtime_start", "")
+        print("Raw bedtime_start value:", bedtime_start)  # Print raw bedtime_start value
         if bedtime_start:
             results["bedtime_start_date"] = bedtime_start.split("T")[0]  # Extract date
             results["bedtime_start_time"] = bedtime_start.split("T")[1].split("Z")[0]  # Extract time
@@ -101,7 +102,7 @@ def upload_to_d1(data):
             {"type": "integer", "value": data["sleep_score"]},
             {"type": "text", "value": data.get("bedtime_start_date", "")},
             {"type": "text", "value": data.get("bedtime_start_time", "")},
-            {"type": "text", "value": data["total_sleep"]},
+            {"type": "text", "value": str(data["total_sleep"])},
             {"type": "integer", "value": data.get("resting_heart_rate", 0)},
             {"type": "integer", "value": data.get("average_hrv", 0)},
             {"type": "real", "value": data.get("spo2_avg", 0)},
