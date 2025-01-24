@@ -1,4 +1,0 @@
-[[d1_databases]]
-binding = "DB"
-database_name = "sam_health_data"
-database_id = "" # Add your D1 database ID here
