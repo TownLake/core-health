@@ -8,48 +8,48 @@ def fetch_oura_data(date):
     oura_token = os.environ['OURA_TOKEN']
     headers = {'Authorization': f'Bearer {oura_token}'}
     
-    # Fetch sleep data
-    sleep_response = requests.get(
-        'https://api.ouraring.com/v2/usercollection/sleep',
-        headers=headers,
-        params={'start_date': date, 'end_date': date}
-    ).json()
+    # Fetch all required data
+    responses = {
+        'sleep': requests.get(
+            'https://api.ouraring.com/v2/usercollection/sleep',
+            headers=headers,
+            params={'start_date': date, 'end_date': date}
+        ).json(),
+        'daily_sleep': requests.get(
+            'https://api.ouraring.com/v2/usercollection/daily_sleep',
+            headers=headers,
+            params={'start_date': date, 'end_date': date}
+        ).json(),
+        'spo2': requests.get(
+            'https://api.ouraring.com/v2/usercollection/daily_spo2',
+            headers=headers,
+            params={'start_date': date, 'end_date': date}
+        ).json(),
+        'cardio': requests.get(
+            'https://api.ouraring.com/v2/usercollection/daily_cardiovascular_age',
+            headers=headers,
+            params={'start_date': date, 'end_date': date}
+        ).json()
+    }
     
-    # Fetch daily sleep data
-    daily_sleep_response = requests.get(
-        'https://api.ouraring.com/v2/usercollection/daily_sleep',
-        headers=headers,
-        params={'start_date': date, 'end_date': date}
-    ).json()
+    # Print raw responses for debugging
+    print("Raw API Responses:")
+    print(json.dumps(responses, indent=2))
     
-    # Fetch SPO2 data
-    spo2_response = requests.get(
-        'https://api.ouraring.com/v2/usercollection/daily_spo2',
-        headers=headers,
-        params={'start_date': date, 'end_date': date}
-    ).json()
-    
-    # Fetch cardiovascular age data
-    cardio_response = requests.get(
-        'https://api.ouraring.com/v2/usercollection/daily_cardiovascular_age',
-        headers=headers,
-        params={'start_date': date, 'end_date': date}
-    ).json()
-    
-    # Extract and format data
-    sleep_data = sleep_response['data'][0] if sleep_response['data'] else {}
-    daily_sleep_data = daily_sleep_response['data'][0] if daily_sleep_response['data'] else {}
-    spo2_data = spo2_response['data'][0] if spo2_response['data'] else {}
-    cardio_data = cardio_response['data'][0] if cardio_response['data'] else {}
+    # Extract data from first records
+    sleep_data = responses['sleep']['data'][0] if responses['sleep'].get('data') and responses['sleep']['data'] else {}
+    daily_sleep = responses['daily_sleep']['data'][0] if responses['daily_sleep'].get('data') and responses['daily_sleep']['data'] else {}
+    spo2_data = responses['spo2']['data'][0] if responses['spo2'].get('data') and responses['spo2']['data'] else {}
+    cardio_data = responses['cardio']['data'][0] if responses['cardio'].get('data') and responses['cardio']['data'] else {}
     
     bedtime_start = sleep_data.get('bedtime_start', '')
-    bedtime_date = bedtime_start.split('T')[0] if bedtime_start else None
-    bedtime_time = bedtime_start.split('T')[1] if bedtime_start else None
+    bedtime_date = bedtime_start.split('T')[0] if 'T' in bedtime_start else None
+    bedtime_time = bedtime_start.split('T')[1] if 'T' in bedtime_start else None
     
     formatted_data = {
         'date': date,
         'deep_sleep_minutes': int(sleep_data.get('deep_sleep_duration', 0) / 60),
-        'sleep_score': daily_sleep_data.get('score', 0),
+        'sleep_score': daily_sleep.get('score', 0),
         'bedtime_start_date': bedtime_date,
         'bedtime_start_time': bedtime_time,
         'total_sleep': str(timedelta(seconds=sleep_data.get('total_sleep_duration', 0))),
@@ -59,7 +59,7 @@ def fetch_oura_data(date):
         'cardio_age': cardio_data.get('vascular_age', 0)
     }
     
-    print(f"Data captured for {date}:")
+    print("\nFormatted Data:")
     print(json.dumps(formatted_data, indent=2))
     return formatted_data
 
@@ -72,7 +72,6 @@ def store_in_d1(data):
         'Content-Type': 'application/json'
     }
     
-    # Insert data into D1
     query = """
     INSERT INTO oura_data (
         date, deep_sleep_minutes, sleep_score, bedtime_start_date,
