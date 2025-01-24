@@ -58,12 +58,21 @@ class OuraClient:
 
             # Process sleep data
             sleep_sessions = sleep_data.get('data', [])
+            logger.info(f"Found {len(sleep_sessions)} total sleep sessions")
+            logger.debug(f"Sleep sessions: {json.dumps(sleep_sessions, indent=2)}")
+            
             if not sleep_sessions:
                 logger.warning(f"No sleep sessions found for {target_date}")
                 return None
 
-            # Get the main sleep session (usually the longest one)
-            target_sessions = [s for s in sleep_sessions if s.get('day') == target_date]
+            # Look for sessions that either start or end on target date
+            target_sessions = [s for s in sleep_sessions 
+                             if (s.get('day') == target_date or 
+                                 (s.get('bedtime_end', '').startswith(target_date)))]
+            
+            logger.info(f"Found {len(target_sessions)} sessions for target date")
+            logger.debug(f"Target date sessions: {json.dumps(target_sessions, indent=2)}")
+            
             if not target_sessions:
                 logger.warning(f"No sleep sessions found for target date {target_date}")
                 return None
