@@ -2,13 +2,22 @@ import os
 import sys
 import json
 import requests
+import logging
 from datetime import datetime, date, timedelta, UTC
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class OuraClient:
     def __init__(self, token):
         self.token = token
         self.headers = {'Authorization': f'Bearer {token}'}
         self.base_url = 'https://api.ouraring.com/v2/usercollection'
+        logger.info("Initialized Oura client")
 
     def get_date_range(self, target_date=None):
         if target_date is None:
@@ -16,7 +25,9 @@ class OuraClient:
         elif isinstance(target_date, str):
             target_date = datetime.strptime(target_date, '%Y-%m-%d').date()
         
-        return target_date.strftime('%Y-%m-%d')
+        formatted_date = target_date.strftime('%Y-%m-%d')
+        logger.info(f"Using target date: {formatted_date}")
+        return formatted_date
 
     def fetch_data(self, endpoint, target_date):
         url = f'{self.base_url}/{endpoint}'
@@ -24,84 +35,113 @@ class OuraClient:
             'start_date': target_date,
             'end_date': target_date
         }
-        response = requests.get(url, headers=self.headers, params=params)
-        response.raise_for_status()
-        return response.json()
+        logger.info(f"Fetching data from {endpoint} for date {target_date}")
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"Successfully fetched {endpoint} data")
+            logger.debug(f"Raw {endpoint} response: {json.dumps(data, indent=2)}")
+            return data
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching {endpoint} data: {str(e)}")
+            raise
 
     def get_daily_data(self, target_date):
-        # Fetch all required data
-        sleep_data = self.fetch_data('sleep', target_date)
-        daily_sleep = self.fetch_data('daily_sleep', target_date)
-        cardio_data = self.fetch_data('daily_cardiovascular_age', target_date)
-        spo2_data = self.fetch_data('daily_spo2', target_date)
+        try:
+            # Fetch all required data
+            sleep_data = self.fetch_data('sleep', target_date)
+            daily_sleep = self.fetch_data('daily_sleep', target_date)
+            cardio_data = self.fetch_data('daily_cardiovascular_age', target_date)
+            spo2_data = self.fetch_data('daily_spo2', target_date)
 
-        # Process sleep data
-        sleep_sessions = sleep_data.get('data', [])
-        if not sleep_sessions:
-            return None
+            # Process sleep data
+            sleep_sessions = sleep_data.get('data', [])
+            if not sleep_sessions:
+                logger.warning(f"No sleep sessions found for {target_date}")
+                return None
 
-        # Get the main sleep session (usually the longest one)
-        main_sleep = max(
-            [s for s in sleep_sessions if s.get('day') == target_date],
-            key=lambda x: x.get('total_sleep_duration', 0),
-            default=None
-        )
+            # Get the main sleep session (usually the longest one)
+            target_sessions = [s for s in sleep_sessions if s.get('day') == target_date]
+            if not target_sessions:
+                logger.warning(f"No sleep sessions found for target date {target_date}")
+                return None
 
-        if not main_sleep:
-            return None
+            main_sleep = max(target_sessions, key=lambda x: x.get('total_sleep_duration', 0))
+            logger.info(f"Found main sleep session for {target_date}")
+            logger.debug(f"Main sleep session data: {json.dumps(main_sleep, indent=2)}")
 
-        # Get sleep score from daily_sleep endpoint
-        sleep_score = next(
-            (item['score'] for item in daily_sleep.get('data', [])
-             if item.get('day') == target_date),
-            None
-        )
+            # Get sleep score from daily_sleep endpoint
+            sleep_score = next(
+                (item['score'] for item in daily_sleep.get('data', [])
+                 if item.get('day') == target_date),
+                None
+            )
+            logger.info(f"Sleep score for {target_date}: {sleep_score}")
 
-        # Process SpO2 data
-        spo2_info = next(
-            (item for item in spo2_data.get('data', [])
-             if item.get('day') == target_date),
-            {}
-        )
-        spo2_percentage = spo2_info.get('spo2_percentage', {})
-        spo2_avg = (spo2_percentage.get('average') 
-                   if isinstance(spo2_percentage, dict) else None)
+            # Process SpO2 data
+            spo2_info = next(
+                (item for item in spo2_data.get('data', [])
+                 if item.get('day') == target_date),
+                {}
+            )
+            spo2_percentage = spo2_info.get('spo2_percentage', {})
+            spo2_avg = (spo2_percentage.get('average') 
+                       if isinstance(spo2_percentage, dict) else None)
+            logger.info(f"SpO2 average for {target_date}: {spo2_avg}")
 
-        # Process cardio age data
-        cardio_info = next(
-            (item for item in cardio_data.get('data', [])
-             if item.get('day') == target_date),
-            {}
-        )
+            # Process cardio age data
+            cardio_info = next(
+                (item for item in cardio_data.get('data', [])
+                 if item.get('day') == target_date),
+                {}
+            )
+            cardio_age = cardio_info.get('vascular_age')
+            logger.info(f"Cardio age for {target_date}: {cardio_age}")
 
-        # Format bedtime
-        bedtime_start = main_sleep.get('bedtime_start')
-        if bedtime_start:
-            dt = datetime.fromisoformat(bedtime_start.replace('Z', '+00:00'))
-            bedtime_date = dt.strftime('%Y-%m-%d')
-            bedtime_time = dt.strftime('%H:%M:%S')
-        else:
-            bedtime_date = bedtime_time = None
+            # Format bedtime
+            bedtime_start = main_sleep.get('bedtime_start')
+            if bedtime_start:
+                dt = datetime.fromisoformat(bedtime_start.replace('Z', '+00:00'))
+                bedtime_date = dt.strftime('%Y-%m-%d')
+                bedtime_time = dt.strftime('%H:%M:%S')
+                logger.info(f"Bedtime: {bedtime_date} {bedtime_time}")
+            else:
+                bedtime_date = bedtime_time = None
+                logger.warning("No bedtime data available")
 
-        # Format total sleep
-        total_sleep_minutes = round(main_sleep.get('total_sleep_duration', 0) / 60)
-        total_sleep = (f"{total_sleep_minutes // 60:02d}:"
-                      f"{total_sleep_minutes % 60:02d}"
-                      if total_sleep_minutes else None)
+            # Format total sleep
+            total_sleep_minutes = round(main_sleep.get('total_sleep_duration', 0) / 60)
+            total_sleep = (f"{total_sleep_minutes // 60:02d}:"
+                          f"{total_sleep_minutes % 60:02d}"
+                          if total_sleep_minutes else None)
+            logger.info(f"Total sleep: {total_sleep}")
 
-        return {
-            'date': target_date,
-            'deep_sleep_minutes': round(main_sleep.get('deep_sleep_duration', 0) / 60),
-            'sleep_score': sleep_score,
-            'bedtime_start_date': bedtime_date,
-            'bedtime_start_time': bedtime_time,
-            'total_sleep': total_sleep,
-            'resting_heart_rate': main_sleep.get('lowest_heart_rate'),
-            'average_hrv': main_sleep.get('average_hrv'),
-            'spo2_avg': spo2_avg,
-            'cardio_age': cardio_info.get('vascular_age'),
-            'collected_at': datetime.now(UTC).isoformat()
-        }
+            deep_sleep_minutes = round(main_sleep.get('deep_sleep_duration', 0) / 60)
+            resting_heart_rate = main_sleep.get('lowest_heart_rate')
+            average_hrv = main_sleep.get('average_hrv')
+
+            daily_data = {
+                'date': target_date,
+                'deep_sleep_minutes': deep_sleep_minutes,
+                'sleep_score': sleep_score,
+                'bedtime_start_date': bedtime_date,
+                'bedtime_start_time': bedtime_time,
+                'total_sleep': total_sleep,
+                'resting_heart_rate': resting_heart_rate,
+                'average_hrv': average_hrv,
+                'spo2_avg': spo2_avg,
+                'cardio_age': cardio_age,
+                'collected_at': datetime.now(UTC).isoformat()
+            }
+
+            logger.info("Successfully compiled daily data")
+            logger.debug(f"Compiled data: {json.dumps(daily_data, indent=2)}")
+            return daily_data
+
+        except Exception as e:
+            logger.error(f"Error processing daily data: {str(e)}", exc_info=True)
+            raise
 
 class CloudflareD1:
     def __init__(self, account_id, api_token):
@@ -111,10 +151,11 @@ class CloudflareD1:
             'Content-Type': 'application/json'
         }
         self.base_url = f'https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/sam_health_data'
+        logger.info("Initialized Cloudflare D1 client")
 
     def insert_data(self, data):
         if not data:
-            print("No data to insert")
+            logger.warning("No data to insert")
             return False
 
         # Construct SQL query with parameterized values
@@ -125,6 +166,9 @@ class CloudflareD1:
             INSERT INTO oura_data ({columns})
             VALUES ({placeholders})
         """
+        
+        logger.info(f"Executing query with columns: {columns}")
+        logger.debug(f"Query parameters: {list(data.values())}")
 
         # Make the API request
         url = f'{self.base_url}/query'
@@ -133,21 +177,37 @@ class CloudflareD1:
             'params': list(data.values())
         }
 
-        response = requests.post(url, headers=self.headers, json=payload)
-        
-        if response.status_code == 200:
-            print("Successfully inserted data into D1")
-            return True
-        else:
-            print(f"Error inserting data: {response.status_code}")
-            print(response.text)
+        try:
+            response = requests.post(url, headers=self.headers, json=payload)
+            response_data = response.json()
+            
+            if response.status_code == 200:
+                logger.info("Successfully inserted data into D1")
+                logger.debug(f"D1 response: {json.dumps(response_data, indent=2)}")
+                return True
+            else:
+                logger.error(f"Error inserting data: {response.status_code}")
+                logger.error(f"Error response: {response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error inserting data: {str(e)}", exc_info=True)
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error inserting data: {str(e)}", exc_info=True)
             return False
 
 def main(target_date=None):
+    logger.info(f"Starting Oura data collection for date: {target_date or 'today'}")
+
     # Get environment variables
-    oura_token = os.environ['OURA_TOKEN']
-    cf_account_id = os.environ['CLOUDFLARE_ACCOUNT_ID']
-    cf_api_token = os.environ['CLOUDFLARE_API_TOKEN']
+    try:
+        oura_token = os.environ['OURA_TOKEN']
+        cf_account_id = os.environ['CLOUDFLARE_ACCOUNT_ID']
+        cf_api_token = os.environ['CLOUDFLARE_API_TOKEN']
+    except KeyError as e:
+        logger.error(f"Missing required environment variable: {str(e)}")
+        raise
 
     try:
         # Initialize clients
@@ -156,12 +216,12 @@ def main(target_date=None):
 
         # Get and format target date
         formatted_date = oura.get_date_range(target_date)
-        print(f"Fetching data for date: {formatted_date}")
+        logger.info(f"Processing data for date: {formatted_date}")
 
         # Fetch and process data
         daily_data = oura.get_daily_data(formatted_date)
         if not daily_data:
-            print(f"No data found for {formatted_date}")
+            logger.error(f"No data found for {formatted_date}")
             return
 
         # Store data in D1
@@ -169,10 +229,10 @@ def main(target_date=None):
         if not success:
             raise Exception("Failed to store data in D1")
 
-        print("Data collection and storage completed successfully")
+        logger.info("Data collection and storage completed successfully")
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Fatal error in main process: {str(e)}", exc_info=True)
         raise e
 
 if __name__ == "__main__":
