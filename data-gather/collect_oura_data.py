@@ -56,6 +56,12 @@ class OuraClient:
         cardio_data = self.fetch_data('daily_cardiovascular_age', target_date, target_date)
         spo2_data = self.fetch_data('daily_spo2', target_date, target_date)
 
+        logger.info("Raw API responses:")
+        logger.info(f"Daily sleep: {json.dumps(daily_sleep, indent=2)}")
+        logger.info(f"Daily readiness: {json.dumps(daily_readiness, indent=2)}")
+        logger.info(f"Cardio data: {json.dumps(cardio_data, indent=2)}")
+        logger.info(f"SPO2 data: {json.dumps(spo2_data, indent=2)}")
+
         # Get target date metrics
         target_sleep = next((item for item in daily_sleep if item['day'] == target_date), {})
         target_readiness = next((item for item in daily_readiness if item['day'] == target_date), {})
@@ -118,6 +124,20 @@ class CloudflareD1:
         if not data:
             logger.warning("No data to insert")
             return False
+            
+        # First verify DB exists
+        try:
+            test_response = requests.get(
+                f'{self.base_url}/sam_health_data',
+                headers=self.headers
+            )
+            logger.info(f"Database check response: {test_response.text}")
+            if test_response.status_code != 200:
+                logger.error("Cannot access database")
+                return False
+        except Exception as e:
+            logger.error(f"Error checking database: {str(e)}")
+            return False
 
         # D1 expects flattened data
         flattened_data = {
@@ -133,6 +153,9 @@ class CloudflareD1:
             'cardio_age': data['health']['cardio_age'],
             'collected_at': data['metadata']['collected_at']
         }
+        
+        logger.info("Flattened data to insert:")
+        logger.info(json.dumps(flattened_data, indent=2))
 
         # Construct SQL query with parameterized values
         columns = ', '.join(flattened_data.keys())
