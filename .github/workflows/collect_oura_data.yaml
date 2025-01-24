@@ -44,7 +44,7 @@ jobs:
         run: |
           # Pass target_date if user triggers a manual workflow dispatch with an input
           if [ "${{ github.event.inputs.target_date }}" != "" ]; then
-            python collect_oura_data.py "${{ github.event.inputs.target_date }}"
+            python data-gather/collect_oura_data.py "${{ github.event.inputs.target_date }}"
           else
             python data-gather/collect_oura_data.py
           fi
