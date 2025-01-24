@@ -65,14 +65,26 @@ class OuraClient:
                 logger.warning(f"No sleep sessions found for {target_date}")
                 return None
 
-            # Look for sessions that either start or end on target date
+            # Look for sessions that either:
+            # 1. Have the target date as their day
+            # 2. End on the target date
+            # 3. Start on the target date
             target_sessions = [s for s in sleep_sessions 
                              if (s.get('day') == target_date or 
-                                 (s.get('bedtime_end', '').startswith(target_date)))]
+                                 (s.get('bedtime_end', '').startswith(target_date)) or
+                                 (s.get('bedtime_start', '').startswith(target_date)))]
             
             logger.info(f"Found {len(target_sessions)} sessions for target date")
             logger.debug(f"Target date sessions: {json.dumps(target_sessions, indent=2)}")
             
+            if not target_sessions:
+                # Check two days around the target date since sleep can span days
+                expanded_sessions = [s for s in sleep_sessions 
+                                  if s.get('bedtime_end') and s.get('bedtime_start')]
+                logger.info(f"Checking expanded date range, found {len(expanded_sessions)} sessions")
+                if expanded_sessions:
+                    target_sessions = [expanded_sessions[0]]
+                
             if not target_sessions:
                 logger.warning(f"No sleep sessions found for target date {target_date}")
                 return None
