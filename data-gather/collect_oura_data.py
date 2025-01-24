@@ -3,8 +3,13 @@ import json
 import os
 import subprocess
 from datetime import datetime, date, timedelta, UTC
+import sys
 
 class OuraDataFetcher:
+    """
+    Fetch Oura ring data from the official Oura APIs.
+    This class focuses on daily sleep, SPO2, and cardiovascular age data.
+    """
     def __init__(self, token):
         self.token = token
         self.headers = {
@@ -13,6 +18,11 @@ class OuraDataFetcher:
         self.base_url = 'https://api.ouraring.com/v2/usercollection'
         
     def get_date_range(self, target_date=None):
+        """
+        Returns a date range for fetching data. 
+        e.g. if target_date=2025-01-24, it fetches data from 2 days before to 1 day after
+        to ensure we capture the relevant session that might cross midnight.
+        """
         if target_date is None:
             target_date = date.today()
         elif isinstance(target_date, str):
@@ -23,6 +33,10 @@ class OuraDataFetcher:
         return start_date, end_date, target_date.strftime('%Y-%m-%d')
         
     def fetch_sleep_data(self):
+        """
+        Fetch full sleep session data (start/end times, deep sleep, etc.)
+        and daily_sleep data (which has the daily sleep score).
+        """
         start_date, end_date, _ = self.get_date_range()
         url = f'{self.base_url}/sleep'
         params = {
@@ -33,7 +47,7 @@ class OuraDataFetcher:
         response.raise_for_status()
         sleep_data = response.json()
         
-        # Fetch daily sleep scores
+        # Also fetch daily sleep scores
         url = f'{self.base_url}/daily_sleep'
         response = requests.get(url, headers=self.headers, params=params)
         response.raise_for_status()
@@ -42,6 +56,9 @@ class OuraDataFetcher:
         return sleep_data, daily_sleep_data
         
     def fetch_cardio_age(self):
+        """
+        Fetch the daily cardiovascular age data (vascular_age).
+        """
         _, _, target_date = self.get_date_range()
         url = f'{self.base_url}/daily_cardiovascular_age'
         params = {
@@ -53,6 +70,9 @@ class OuraDataFetcher:
         return response.json()
         
     def fetch_spo2(self):
+        """
+        Fetch daily SPO2 info for the target date.
+        """
         _, _, target_date = self.get_date_range()
         url = f'{self.base_url}/daily_spo2'
         params = {
@@ -64,12 +84,20 @@ class OuraDataFetcher:
         return response.json()
 
 def format_time_components(datetime_str):
+    """
+    Split an ISO datetime into (YYYY-MM-DD, HH:MM:SS).
+    Returns (None, None) if datetime_str is missing.
+    """
     if not datetime_str:
         return None, None
     dt = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
     return dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
 
 def minutes_to_hhmm(minutes):
+    """
+    Convert an integer number of minutes to "HH:MM" format.
+    For example, 90 -> "01:30".
+    """
     if not minutes:
         return None
     hours = minutes // 60
@@ -77,152 +105,156 @@ def minutes_to_hhmm(minutes):
     return f"{hours:02d}:{remaining_minutes:02d}"
 
 def find_relevant_sleep_session(data, target_date):
-    """Find the most relevant sleep session for the target date."""
+    """
+    Find the most relevant sleep session for the target date
+    (e.g., if Oura splits it across midnight or multiple sleeps).
+    We pick the session with the largest total_sleep_duration.
+    """
     items = data.get('data', [])
-    print(f"Found {len(items)} sleep sessions")
+    print(f"Found {len(items)} sleep sessions in the window.")
     for item in items:
-        print(f"Sleep session: date={item.get('day')}, start={item.get('bedtime_start')}, end={item.get('bedtime_end')}")
-    print("Raw sleep info:", json.dumps(items, indent=2))
+        print(f" - date={item.get('day')}, start={item.get('bedtime_start')}, end={item.get('bedtime_end')}")
     
     if not items:
-        print(f"No sleep sessions found for {target_date}")
+        print(f"No sleep sessions found near {target_date}")
         return {}
         
+    # Direct match on "day"
     target_sessions = [item for item in items if item.get('day') == target_date]
-    
     if target_sessions:
-        return max(target_sessions, 
-                  key=lambda x: x.get('total_sleep_duration', 0))
+        return max(target_sessions, key=lambda x: x.get('total_sleep_duration', 0))
     
+    # If no direct match, check if bedtime_end starts with target_date
     target_sessions = [
-        item for item in items 
+        item for item in items
         if item.get('bedtime_end') and str(item.get('bedtime_end')).startswith(target_date)
     ]
-    
     if target_sessions:
-        return max(target_sessions, 
-                  key=lambda x: x.get('total_sleep_duration', 0))
+        return max(target_sessions, key=lambda x: x.get('total_sleep_duration', 0))
     
     return {}
 
-def store_in_workers_kv(namespace_id, data, date_key=None):
-    """Store data in Workers KV using wrangler."""
+def store_in_d1_columns(d1_db_name, data_dict, date_key):
+    """
+    Inserts/updates Oura daily metrics into columns for the D1 table: oura_data.
+    Columns:
+      date (PK), deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time, ...
+      resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at, etc.
+    """
+    
+    # Helper to safely convert Python values to SQL
+    def sql_str(val, is_text=False):
+        """Return a safely escaped value for SQL (or NULL if None)."""
+        if val is None:
+            return "NULL"
+        if is_text:
+            return f"'{str(val).replace(\"'\", \"''\")}'"
+        return str(val)
+    
+    # Pull out the fields from data_dict
+    deep_sleep = data_dict["sleep"]["deep_sleep_minutes"]
+    sleep_score = data_dict["sleep"]["sleep_score"]
+    bed_start_date = data_dict["sleep"]["bedtime_start_date"]
+    bed_start_time = data_dict["sleep"]["bedtime_start_time"]
+    total_sleep = data_dict["sleep"]["total_sleep"]
+    rhr = data_dict["sleep"]["resting_heart_rate"]
+    hrv = data_dict["sleep"]["average_hrv"]
+    spo2 = data_dict["health"]["spo2_avg"]
+    cardio_age = data_dict["health"]["cardio_age"]
+    collected = data_dict["metadata"]["collected_at"]
+    
+    # Construct an UPSERT (INSERT ... ON CONFLICT ...)
+    upsert_sql = f"""
+    INSERT INTO oura_data (
+      date, deep_sleep_minutes, sleep_score,
+      bedtime_start_date, bedtime_start_time, total_sleep,
+      resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at
+    ) VALUES (
+      {sql_str(date_key, True)},       -- date is text
+      {sql_str(deep_sleep)},           -- integer
+      {sql_str(sleep_score)},          -- integer
+      {sql_str(bed_start_date, True)}, -- text
+      {sql_str(bed_start_time, True)}, -- text
+      {sql_str(total_sleep, True)},    -- text
+      {sql_str(rhr)},                  -- integer
+      {sql_str(hrv)},                  -- integer
+      {sql_str(spo2)},                 -- real
+      {sql_str(cardio_age)},           -- integer
+      {sql_str(collected, True)}       -- text
+    )
+    ON CONFLICT(date) DO UPDATE SET
+      deep_sleep_minutes=excluded.deep_sleep_minutes,
+      sleep_score=excluded.sleep_score,
+      bedtime_start_date=excluded.bedtime_start_date,
+      bedtime_start_time=excluded.bedtime_start_time,
+      total_sleep=excluded.total_sleep,
+      resting_heart_rate=excluded.resting_heart_rate,
+      average_hrv=excluded.average_hrv,
+      spo2_avg=excluded.spo2_avg,
+      cardio_age=excluded.cardio_age,
+      collected_at=excluded.collected_at;
+    """
+    
+    print("Running UPSERT SQL:\n", upsert_sql)
+    
     try:
-        print("Getting existing data from Workers KV...")
-        wrangler_check = subprocess.run(['wrangler', '--version'], capture_output=True, text=True)
-        print(f"Wrangler version: {wrangler_check.stdout.strip()}")
-        
-        get_result = subprocess.run(
-            ['wrangler', 'kv:key', 'get', '--namespace-id', namespace_id, 'oura_data'],
+        upsert_proc = subprocess.run(
+            ["wrangler", "d1", "execute", d1_db_name, "--command", upsert_sql],
             capture_output=True,
-            text=True
+            text=True,
+            check=True
         )
-        
-        print(f"Get command stdout: {get_result.stdout}")
-        print(f"Get command stderr: {get_result.stderr}")
-        print(f"Get command return code: {get_result.returncode}")
-
-        if get_result.returncode == 0 and get_result.stdout.strip():
-            try:
-                existing_data = json.loads(get_result.stdout)
-                print("Successfully parsed existing data")
-            except json.JSONDecodeError as e:
-                print(f"Error parsing existing data: {e}")
-                print(f"Raw data received: {get_result.stdout[:200]}...")
-                existing_data = {}
-        else:
-            print("No existing data found, starting fresh")
-            existing_data = {}
-
-        date_key = date_key or date.today().strftime('%Y-%m-%d')
-        
-        if date_key in existing_data:
-            print(f"Warning: Data already exists for {date_key}")
-            print("Existing data:", json.dumps(existing_data[date_key], indent=2))
-            print("New data:", json.dumps(data, indent=2))
-            merged_data = {}
-            for category in ['sleep', 'health', 'metadata']:
-                if category in data:
-                    merged_data[category] = data[category]
-            merged_data['date'] = data.get('date')
-            data = merged_data
-            print("Merged data:", json.dumps(data, indent=2))
-            
-        existing_data[date_key] = data
-
-        sorted_data = dict(sorted(existing_data.items()))
-        with open('temp_oura_data.json', 'w') as f:
-            json.dump(sorted_data, f)
-
-        print("Storing in Workers KV...")
-        with open('temp_oura_data.json', 'r') as f:
-            file_content = f.read()
-            print(f"File content length: {len(file_content)} characters")
-            print(f"First 100 characters of content: {file_content[:100]}...")
-
-        put_result = subprocess.run(
-            ['wrangler', 'kv:key', 'put',
-             '--namespace-id', namespace_id,
-             'oura_data', file_content],
-            capture_output=True,
-            text=True
-        )
-
-        print(f"Put command stdout: {put_result.stdout}")
-        print(f"Put command stderr: {put_result.stderr}")
-        print(f"Put command return code: {put_result.returncode}")
-
-        os.remove('temp_oura_data.json')
-        
-        if put_result.returncode != 0:
-            raise Exception(f"Wrangler command failed with return code {put_result.returncode}")
-            
-        print("Successfully stored data in Workers KV")
+        print("D1 UPSERT stdout:", upsert_proc.stdout)
+        print("D1 UPSERT stderr:", upsert_proc.stderr)
         return True
-
-    except Exception as e:
-        print(f"Error storing data in Workers KV: {str(e)}")
-        print(f"Exception type: {type(e)}")
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
+    except subprocess.CalledProcessError as e:
+        print("Error inserting/updating data in D1:", e)
         return False
 
 def main(target_date=None):
+    """
+    Main entrypoint:
+      1) Determine which date's data to fetch (default: today's date).
+      2) Fetch the relevant Oura metrics.
+      3) Insert/Update them into the D1 table.
+    """
     try:
-        print(f"Starting Oura data collection for date: {target_date or 'today'}...")
         if target_date is None:
             target_date = date.today().strftime('%Y-%m-%d')
-            
-        print(f"Using formatted date: {target_date}")
+        print(f"Collecting Oura data for date: {target_date}")
         
         token = os.environ['OURA_TOKEN']
-        namespace_id = os.environ['WORKERS_KV_NAMESPACE_ID']
-
-        print(f"Using namespace ID: {namespace_id}")
-
+        d1_db_name = os.environ.get('CLOUDFLARE_D1_DB')
+        if not d1_db_name:
+            raise ValueError("CLOUDFLARE_D1_DB environment variable is not set. Please provide your D1 DB name or binding.")
+        
         fetcher = OuraDataFetcher(token)
         _, _, date_key = fetcher.get_date_range(target_date)
-
-        print("Fetching data from Oura API...")
+        
+        # Fetch from Oura
+        print("Fetching sleep data...")
         sleep_data, daily_sleep_data = fetcher.fetch_sleep_data()
+        print("Fetching cardio age data...")
         cardio_data = fetcher.fetch_cardio_age()
+        print("Fetching SPO2 data...")
         spo2_data = fetcher.fetch_spo2()
-
-        print("Processing data...")
+        
+        # Process the data
+        print("Finding relevant sleep session...")
         sleep_info = find_relevant_sleep_session(sleep_data, target_date)
         
-        # Get sleep score from daily_sleep endpoint
+        # daily_sleep_data -> for daily sleep score
         daily_sleep_scores = {item['day']: item['score'] for item in daily_sleep_data.get('data', [])}
         sleep_score = daily_sleep_scores.get(target_date)
         
         cardio_info = cardio_data.get('data', [{}])[0]
         spo2_info = spo2_data.get('data', [{}])[0]
-
         spo2_percentage = spo2_info.get('spo2_percentage', {})
-        spo2_avg = spo2_percentage.get('average') if isinstance(spo2_percentage, dict) else None
-
+        spo2_avg = spo2_percentage.get('average')
+        
+        # Build a dictionary of fields we want to store in columns
         daily_data = {
-            'date': sleep_info.get('day'),
+            'date': sleep_info.get('day', date_key),
             'sleep': {
                 'deep_sleep_minutes': round(sleep_info.get('deep_sleep_duration', 0) / 60),
                 'sleep_score': sleep_score,
@@ -240,21 +272,19 @@ def main(target_date=None):
                 'collected_at': datetime.now(UTC).isoformat()
             }
         }
-
-        print("Storing data...")
-        success = store_in_workers_kv(namespace_id, daily_data, date_key)
+        
+        # Store in D1
+        print(f"Storing row for date_key={date_key} in D1 columns...")
+        success = store_in_d1_columns(d1_db_name, daily_data, date_key)
         if not success:
-            raise Exception("Failed to store data in Workers KV")
-
-        print("Data collection completed successfully")
-
+            raise Exception("Failed to store Oura data in D1.")
+        
+        print("Data collection completed successfully!")
+    
     except Exception as e:
-        print(f"Error: {str(e)}")
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
+        print("Error in main:", str(e))
         raise e
 
 if __name__ == "__main__":
-    import sys
-    target_date = sys.argv[1] if len(sys.argv) > 1 else None
-    main(target_date)
+    target_date_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    main(target_date_arg)
