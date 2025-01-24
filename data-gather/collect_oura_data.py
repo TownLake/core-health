@@ -3,7 +3,8 @@ import sys
 import json
 import requests
 import logging
-from datetime import datetime, date, timedelta, UTC
+from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 
 # Configure logging
 logging.basicConfig(
@@ -132,7 +133,7 @@ class OuraClient:
                 'average_hrv': average_hrv,
                 'spo2_avg': spo2_avg,
                 'cardio_age': cardio_age,
-                'collected_at': datetime.now(UTC).isoformat()
+                'collected_at': datetime.now(ZoneInfo('UTC')).isoformat()
             }
 
             logger.info("Successfully compiled daily data")
