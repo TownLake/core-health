@@ -47,8 +47,8 @@ def fetch_oura_data(start_date, end_date):
             results["bedtime_start_date"] = bedtime_start.split("T")[0]  # Extract date
             results["bedtime_start_time"] = bedtime_start.split("T")[1].split("Z")[0]  # Extract time
         else:
-            results["bedtime_start_date"] = ""
-            results["bedtime_start_time"] = ""
+            results["bedtime_start_date"] = None
+            results["bedtime_start_time"] = None
             print(f"Warning: bedtime_start missing for {start_date}")
 
         results["resting_heart_rate"] = bedtime_entry.get("lowest_heart_rate", 0)
@@ -81,33 +81,22 @@ def fetch_oura_data(start_date, end_date):
 def upload_to_d1(data):
     query = f"""
     INSERT INTO oura_data (date, deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time, total_sleep, resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (date) DO UPDATE SET
-      deep_sleep_minutes = excluded.deep_sleep_minutes,
-      sleep_score = excluded.sleep_score,
-      bedtime_start_date = excluded.bedtime_start_date,
-      bedtime_start_time = excluded.bedtime_start_time,
-      total_sleep = excluded.total_sleep,
-      resting_heart_rate = excluded.resting_heart_rate,
-      average_hrv = excluded.average_hrv,
-      spo2_avg = excluded.spo2_avg,
-      cardio_age = excluded.cardio_age,
-      collected_at = excluded.collected_at;
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
     payload = {
         "sql": query,
-        "bindings": [
-            {"type": "text", "value": data["date"]},
-            {"type": "integer", "value": data["deep_sleep_minutes"]},
-            {"type": "integer", "value": data["sleep_score"]},
-            {"type": "text", "value": None if data.get("bedtime_start_date", "") == "" else data.get("bedtime_start_date")},
-            {"type": "text", "value": None if data.get("bedtime_start_time", "") == "" else data.get("bedtime_start_time")},
-            {"type": "integer", "value": data["total_sleep"]},
-            {"type": "integer", "value": data.get("resting_heart_rate", 0)},
-            {"type": "integer", "value": data.get("average_hrv", 0)},
-            {"type": "real", "value": data.get("spo2_avg", 0)},
-            {"type": "integer", "value": data.get("cardio_age", 0)},
-            {"type": "text", "value": data["collected_at"]}
+        "params": [
+            data["date"],
+            data["deep_sleep_minutes"],
+            data["sleep_score"],
+            data.get("bedtime_start_date"),
+            data.get("bedtime_start_time"),
+            data["total_sleep"],
+            data.get("resting_heart_rate", 0),
+            data.get("average_hrv", 0),
+            data.get("spo2_avg", 0),
+            data.get("cardio_age", 0),
+            data["collected_at"]
         ]
     }
 
