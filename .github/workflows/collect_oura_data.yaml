@@ -1,40 +1,40 @@
-name: Fetch Oura Ring Data
+name: Collect Oura Data
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # Runs at 9 AM UTC daily
+    - cron: '0 9 * * *' # Trigger daily at 9 AM UTC
   workflow_dispatch:
     inputs:
       date:
-        description: 'Date to fetch (YYYY-MM-DD)'
+        description: 'Enter the date for which to fetch data (YYYY-MM-DD)'
         required: false
         default: ''
 
 jobs:
-  fetch-and-store:
+  collect_oura_data:
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests
-    
-    - name: Fetch and store Oura data
-      env:
-        OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
-        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.date }}" != "" ]; then
-          python data-gather/collect_oura_data.py "${{ github.event.inputs.date }}"
-        else
-          python data-gather/collect_oura_data.py
-        fi
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests sqlite3
+
+      - name: Run data collection script
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            python data-gather/collect_oura_data.py --date ${{ github.event.inputs.date }}
+          else
+            python data-gather/collect_oura_data.py
+          fi
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OURA_TOKEN: ${{ secrets.OURA_TOKEN }}

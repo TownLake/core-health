@@ -1,107 +1,83 @@
 import requests
-import os
-import json
-from datetime import datetime, timedelta
+import sqlite3
 import sys
+import json
+from datetime import datetime
 
-def fetch_oura_data(date):
-    oura_token = os.environ['OURA_TOKEN']
-    headers = {'Authorization': f'Bearer {oura_token}'}
-    
-    # Fetch all required data
-    responses = {
-        'sleep': requests.get(
-            'https://api.ouraring.com/v2/usercollection/sleep',
-            headers=headers,
-            params={'start_date': date, 'end_date': date}
-        ).json(),
-        'daily_sleep': requests.get(
-            'https://api.ouraring.com/v2/usercollection/daily_sleep',
-            headers=headers,
-            params={'start_date': date, 'end_date': date}
-        ).json(),
-        'spo2': requests.get(
-            'https://api.ouraring.com/v2/usercollection/daily_spo2',
-            headers=headers,
-            params={'start_date': date, 'end_date': date}
-        ).json(),
-        'cardio': requests.get(
-            'https://api.ouraring.com/v2/usercollection/daily_cardiovascular_age',
-            headers=headers,
-            params={'start_date': date, 'end_date': date}
-        ).json()
-    }
-    
-    # Print raw responses for debugging
-    print("Raw API Responses:")
-    print(json.dumps(responses, indent=2))
-    
-    # Extract data from first records
-    sleep_data = responses['sleep']['data'][0] if responses['sleep'].get('data') and responses['sleep']['data'] else {}
-    daily_sleep = responses['daily_sleep']['data'][0] if responses['daily_sleep'].get('data') and responses['daily_sleep']['data'] else {}
-    spo2_data = responses['spo2']['data'][0] if responses['spo2'].get('data') and responses['spo2']['data'] else {}
-    cardio_data = responses['cardio']['data'][0] if responses['cardio'].get('data') and responses['cardio']['data'] else {}
-    
-    bedtime_start = sleep_data.get('bedtime_start', '')
-    bedtime_date = bedtime_start.split('T')[0] if 'T' in bedtime_start else None
-    bedtime_time = bedtime_start.split('T')[1] if 'T' in bedtime_start else None
-    
-    formatted_data = {
-        'date': date,
-        'deep_sleep_minutes': int(sleep_data.get('deep_sleep_duration', 0) / 60),
-        'sleep_score': daily_sleep.get('score', 0),
-        'bedtime_start_date': bedtime_date,
-        'bedtime_start_time': bedtime_time,
-        'total_sleep': str(timedelta(seconds=sleep_data.get('total_sleep_duration', 0))),
-        'resting_heart_rate': sleep_data.get('lowest_heart_rate', 0),
-        'average_hrv': sleep_data.get('average_hrv', 0),
-        'spo2_avg': spo2_data.get('spo2_percentage', {}).get('average', 0),
-        'cardio_age': cardio_data.get('vascular_age', 0)
-    }
-    
-    print("\nFormatted Data:")
-    print(json.dumps(formatted_data, indent=2))
-    return formatted_data
+# Oura API endpoints
+SLEEP_API_URL = 'https://api.ouraring.com/v2/usercollection/sleep'
+SLEEP_SCORE_API_URL = 'https://api.ouraring.com/v2/usercollection/daily_sleep'
+SPO2_API_URL = 'https://api.ouraring.com/v2/usercollection/daily_spo2'
+CARDIO_API_URL = 'https://api.ouraring.com/v2/usercollection/daily_cardiovascular_age'
 
-def store_in_d1(data):
-    account_id = os.environ['CLOUDFLARE_ACCOUNT_ID']
-    api_token = os.environ['CLOUDFLARE_API_TOKEN']
-    
+# Cloudflare D1 Database Setup
+DB_FILE = 'd1_database.db'  # Local SQLite file (Cloudflare D1 is compatible with SQLite)
+
+def fetch_oura_data(date=None):
     headers = {
-        'Authorization': f'Bearer {api_token}',
-        'Content-Type': 'application/json'
+        'Authorization': f'Bearer {sys.argv[1]}',  # OURA_TOKEN passed as the first argument
     }
-    
-    query = """
-    INSERT INTO oura_data (
-        date, deep_sleep_minutes, sleep_score, bedtime_start_date,
-        bedtime_start_time, total_sleep, resting_heart_rate,
-        average_hrv, spo2_avg, cardio_age
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    
-    values = [
-        data['date'], data['deep_sleep_minutes'], data['sleep_score'],
-        data['bedtime_start_date'], data['bedtime_start_time'], data['total_sleep'],
-        data['resting_heart_rate'], data['average_hrv'], data['spo2_avg'],
-        data['cardio_age']
-    ]
-    
-    payload = {
-        'sql': query,
-        'params': values
-    }
-    
-    response = requests.post(
-        f'https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/sam_health_data/query',
-        headers=headers,
-        json=payload
-    )
-    
-    print("\nD1 Storage Response:")
-    print(json.dumps(response.json(), indent=2))
 
-if __name__ == "__main__":
-    date = sys.argv[1] if len(sys.argv) > 1 else datetime.now().strftime('%Y-%m-%d')
+    params = {
+        'start_date': date or datetime.now().strftime('%Y-%m-%d'),
+        'end_date': date or datetime.now().strftime('%Y-%m-%d'),
+    }
+
+    # Make API calls to Oura API
+    sleep_response = requests.get(SLEEP_API_URL, headers=headers, params=params)
+    sleep_score_response = requests.get(SLEEP_SCORE_API_URL, headers=headers, params=params)
+    spo2_response = requests.get(SPO2_API_URL, headers=headers, params=params)
+    cardio_response = requests.get(CARDIO_API_URL, headers=headers, params=params)
+
+    # Parse the responses
+    sleep_data = sleep_response.json()
+    sleep_score_data = sleep_score_response.json()
+    spo2_data = spo2_response.json()
+    cardio_data = cardio_response.json()
+
+    return {
+        'date': sleep_data['data'][0]['day'],
+        'deep_sleep_minutes': sleep_data['data'][0]['contributors']['deep_sleep'],
+        'sleep_score': sleep_score_data['data'][0]['score'],
+        'bedtime_start_date': sleep_data['data'][0]['bedtime_start'].split('T')[0],  # Date part
+        'bedtime_start_time': sleep_data['data'][0]['bedtime_start'].split('T')[1],  # Time part
+        'total_sleep': sleep_score_data['data'][0]['contributors']['total_sleep'],
+        'resting_heart_rate': sleep_data['data'][0]['lowest_heart_rate'],
+        'average_hrv': sleep_data['data'][0]['hrv']['items'][0],
+        'spo2_avg': spo2_data['data'][0]['spo2_percentage']['average'],
+        'cardio_age': cardio_data['data'][0]['vascular_age'],
+        'collected_at': datetime.now().isoformat(),
+    }
+
+def insert_data_to_d1(data):
+    conn = sqlite3.connect(DB_FILE)  # Connect to Cloudflare D1 database (local SQLite as placeholder)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO oura_data (
+            date, deep_sleep_minutes, sleep_score, bedtime_start_date, bedtime_start_time,
+            total_sleep, resting_heart_rate, average_hrv, spo2_avg, cardio_age, collected_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (data['date'], data['deep_sleep_minutes'], data['sleep_score'],
+          data['bedtime_start_date'], data['bedtime_start_time'], data['total_sleep'],
+          data['resting_heart_rate'], data['average_hrv'], data['spo2_avg'], data['cardio_age'], data['collected_at']))
+
+    conn.commit()
+    conn.close()
+
+def main(date=None):
+    # Fetch Oura data
     data = fetch_oura_data(date)
-    store_in_d1(data)
+    
+    # Log the data to GitHub Actions console
+    print(f"Collected Data: {json.dumps(data, indent=4)}")
+
+    # Insert data into Cloudflare D1
+    insert_data_to_d1(data)
+    print(f"Data inserted successfully for date {data['date']}.")
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        main(sys.argv[2])  # Manual date input if provided
+    else:
+        main()
