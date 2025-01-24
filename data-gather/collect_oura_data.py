@@ -102,7 +102,7 @@ def upload_to_d1(data):
             {"type": "integer", "value": data["sleep_score"]},
             {"type": "text", "value": data.get("bedtime_start_date", "")},
             {"type": "text", "value": data.get("bedtime_start_time", "")},
-            {"type": "text", "value": str(data["total_sleep"])},
+            {"type": "integer", "value": data["total_sleep"]},
             {"type": "integer", "value": data.get("resting_heart_rate", 0)},
             {"type": "integer", "value": data.get("average_hrv", 0)},
             {"type": "real", "value": data.get("spo2_avg", 0)},
@@ -110,6 +110,16 @@ def upload_to_d1(data):
             {"type": "text", "value": data["collected_at"]}
         ]
     }
+    
+    # Debug: print the query and payload
+    print("SQL Query:", query)
+    print("Payload:", json.dumps(payload, indent=2))
+
+    response = requests.post(D1_API_URL, headers=HEADERS, json=payload)
+    if response.status_code == 200:
+        print("Data uploaded successfully!")
+    else:
+        print("Error uploading data:", response.status_code, response.text)
 
     response = requests.post(D1_API_URL, headers=HEADERS, json=payload)
     if response.status_code == 200:
