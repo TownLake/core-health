@@ -104,21 +104,11 @@ def main():
         target_date = sys.argv[1]
 
     # Only check for Withings tokens if running in GitHub Actions
-    if os.environ.get("GITHUB_ACTIONS"):
-        required_vars = {
-            'WITHINGS_CLIENT_ID': os.getenv('WITHINGS_CLIENT_ID'),
-            'WITHINGS_CLIENT_SECRET': os.getenv('WITHINGS_CLIENT_SECRET'),
-            'WITHINGS_REFRESH_TOKEN': os.getenv('WITHINGS_REFRESH_TOKEN'),
-            'CLOUDFLARE_ACCOUNT_ID': os.getenv('CLOUDFLARE_ACCOUNT_ID'),
-            'CLOUDFLARE_D1_DB': os.getenv('CLOUDFLARE_D1_DB'),
-            'CLOUDFLARE_API_TOKEN': os.getenv('CLOUDFLARE_API_TOKEN')
-        }
-    else:
-        required_vars = {
-            'WITHINGS_CLIENT_ID': os.getenv('WITHINGS_CLIENT_ID'),
-            'WITHINGS_CLIENT_SECRET': os.getenv('WITHINGS_CLIENT_SECRET'),
-            'WITHINGS_REFRESH_TOKEN': os.getenv('WITHINGS_REFRESH_TOKEN')
-        }
+    required_vars = {
+        'WITHINGS_CLIENT_ID': os.getenv('WITHINGS_CLIENT_ID'),
+        'WITHINGS_CLIENT_SECRET': os.getenv('WITHINGS_CLIENT_SECRET'),
+        'WITHINGS_REFRESH_TOKEN': os.getenv('WITHINGS_REFRESH_TOKEN')
+    }
     
     missing = [var for var, val in required_vars.items() if not val]
     if missing:
