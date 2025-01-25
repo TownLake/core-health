@@ -19,8 +19,9 @@ class CloudflareD1:
         INSERT INTO oura_data (
             date, collected_at, deep_sleep_minutes,
             sleep_score, bedtime_start_date, bedtime_start_time,
-            resting_heart_rate, average_hrv, total_sleep, spo2_avg
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            resting_heart_rate, average_hrv, total_sleep, spo2_avg,
+            efficiency, delay
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
         params = [
@@ -33,7 +34,9 @@ class CloudflareD1:
             data["resting_heart_rate"],
             data["average_hrv"],
             data["total_sleep"],
-            data["spo2_avg"]
+            data["spo2_avg"],
+            data["efficiency"],
+            data["delay"]
         ]
 
         payload = {
@@ -64,6 +67,9 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         daily_data = response.json().get('data', [])
         if daily_data:
             data['sleep_score'] = daily_data[0].get('score')
+            contributors = daily_data[0].get('contributors', {})
+            data['efficiency'] = contributors.get('efficiency')
+            data['delay'] = contributors.get('latency')
     except Exception as e:
         print(f"Error fetching daily sleep score: {e}")
     
