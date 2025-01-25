@@ -98,28 +98,24 @@ def refresh_token(client_id: str, client_secret: str, refresh_token: str) -> str
     return None
 
 def main():
-    # Handle command line date argument
-    target_date = datetime.now().strftime('%Y-%m-%d')
-    if len(sys.argv) > 1:
-        target_date = sys.argv[1]
-
-    # Only check for Withings tokens if running in GitHub Actions
-    required_vars = {
-        'WITHINGS_CLIENT_ID': os.getenv('WITHINGS_CLIENT_ID'),
-        'WITHINGS_CLIENT_SECRET': os.getenv('WITHINGS_CLIENT_SECRET'),
-        'WITHINGS_REFRESH_TOKEN': os.getenv('WITHINGS_REFRESH_TOKEN')
-    }
+    account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+    database_id = os.getenv('CLOUDFLARE_D1_DB')
+    bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
+    withings_client_id = os.getenv('WITHINGS_CLIENT_ID')
+    withings_client_secret = os.getenv('WITHINGS_CLIENT_SECRET')
+    withings_refresh_token = os.getenv('WITHINGS_REFRESH_TOKEN')
     
-    missing = [var for var, val in required_vars.items() if not val]
-    if missing:
+    if not all([withings_client_id, withings_client_secret, withings_refresh_token]):
+        missing = [var for var, val in {
+            'WITHINGS_CLIENT_ID': withings_client_id,
+            'WITHINGS_CLIENT_SECRET': withings_client_secret,
+            'WITHINGS_REFRESH_TOKEN': withings_refresh_token
+        }.items() if not val]
         raise ValueError(f"Missing environment variables: {', '.join(missing)}")
 
-    access_token = refresh_token(
-        required_vars['WITHINGS_CLIENT_ID'],
-        required_vars['WITHINGS_CLIENT_SECRET'],
-        required_vars['WITHINGS_REFRESH_TOKEN']
-    )
-    
+    target_date = sys.argv[1] if len(sys.argv) > 1 else datetime.now().strftime('%Y-%m-%d')
+
+    access_token = refresh_token(withings_client_id, withings_client_secret, withings_refresh_token)
     if not access_token:
         raise ValueError("Failed to refresh access token")
 
@@ -127,13 +123,8 @@ def main():
     print("Fetched Withings data:")
     print(json.dumps(withings_data, indent=2))
 
-    if withings_data and os.environ.get("GITHUB_ACTIONS"):
-        account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
-        database_id = os.getenv('CLOUDFLARE_D1_DB')
-        bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
-        
-        if all([account_id, database_id, bearer_token]):
-            d1_client = CloudflareD1(account_id, database_id, bearer_token)
+    if withings_data and all([account_id, database_id, bearer_token]):
+        d1_client = CloudflareD1(account_id, database_id, bearer_token)
         result = d1_client.insert_withings_data(withings_data)
         print("D1 insert result:")
         print(json.dumps(result, indent=2))
