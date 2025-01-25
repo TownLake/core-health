@@ -36,7 +36,7 @@ jobs:
           fi
           
       - name: Fetch Withings data
-        run: python withings-api.py ${{ env.date }}
+        run: python data-gather/collect_withings_data.py ${{ env.date }}
         env:
           WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
           WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
