@@ -26,14 +26,14 @@ class CloudflareD1:
         params = [
             data["date"],
             data["collected_at"],
-            data.get("deep_sleep_minutes"),
-            data.get("sleep_score"),
-            data.get("bedtime_start_date"),
-            data.get("bedtime_start_time"),
-            data.get("resting_heart_rate"),
-            data.get("average_hrv"),
-            data.get("total_sleep"),
-            data.get("spo2_avg")
+            data["deep_sleep_minutes"],
+            data["sleep_score"],
+            data["bedtime_start_date"],
+            data["bedtime_start_time"],
+            data["resting_heart_rate"],
+            data["average_hrv"],
+            data["total_sleep"],
+            data["spo2_avg"]
         ]
 
         payload = {
@@ -55,7 +55,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     }
     
     try:
-        # Daily sleep data
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_sleep',
             headers=headers,
@@ -70,7 +69,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         print(f"Error fetching daily sleep data: {e}")
     
     try:
-        # Detailed sleep data
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/sleep',
             headers=headers,
@@ -96,7 +94,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         print(f"Error fetching detailed sleep data: {e}")
     
     try:
-        # SPO2 data
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_spo2',
             headers=headers,
@@ -112,37 +109,30 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     return data
 
 def main():
-    required_env_vars = {
-        'OURA_TOKEN': 'Oura API token',
-        'CLOUDFLARE_ACCOUNT_ID': 'Cloudflare account ID',
-        'CLOUDFLARE_D1_DB': 'D1 database ID',
-        'CLOUDFLARE_API_TOKEN': 'Cloudflare API token'
-    }
-
-    for var, description in required_env_vars.items():
-        if not os.getenv(var):
-            raise ValueError(f"Missing {description}. Set the {var} environment variable.")
+    account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+    database_id = os.getenv('CLOUDFLARE_D1_DB')
+    bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
+    oura_token = os.getenv('OURA_TOKEN')
+    
+    if not all([account_id, database_id, bearer_token, oura_token]):
+        missing = [var for var, val in {
+            'CLOUDFLARE_ACCOUNT_ID': account_id,
+            'CLOUDFLARE_D1_DB': database_id,
+            'CLOUDFLARE_API_TOKEN': bearer_token,
+            'OURA_TOKEN': oura_token
+        }.items() if not val]
+        raise ValueError(f"Missing environment variables: {', '.join(missing)}")
 
     target_date = os.getenv('TARGET_DATE', datetime.now().strftime('%Y-%m-%d'))
 
-    try:
-        oura_data = fetch_oura_data(os.getenv('OURA_TOKEN'), target_date)
-        print("Fetched Oura data:")
-        print(json.dumps(oura_data, indent=2))
+    oura_data = fetch_oura_data(oura_token, target_date)
+    print("Fetched Oura data:")
+    print(json.dumps(oura_data, indent=2))
 
-        d1_client = CloudflareD1(
-            os.getenv('CLOUDFLARE_ACCOUNT_ID'),
-            os.getenv('CLOUDFLARE_D1_DB'),
-            os.getenv('CLOUDFLARE_API_TOKEN')
-        )
-        
-        result = d1_client.insert_oura_data(oura_data)
-        print("D1 insert result:")
-        print(json.dumps(result, indent=2))
-
-    except Exception as e:
-        print(f"Error: {e}")
-        exit(1)
+    d1_client = CloudflareD1(account_id, database_id, bearer_token)
+    result = d1_client.insert_oura_data(oura_data)
+    print("D1 insert result:")
+    print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":
     main()
