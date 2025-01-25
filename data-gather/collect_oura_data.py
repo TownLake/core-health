@@ -67,9 +67,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         daily_data = response.json().get('data', [])
         if daily_data:
             data['sleep_score'] = daily_data[0].get('score')
-            contributors = daily_data[0].get('contributors', {})
-            data['efficiency'] = contributors.get('efficiency')
-            data['delay'] = contributors.get('latency')
     except Exception as e:
         print(f"Error fetching daily sleep score: {e}")
     
@@ -96,6 +93,8 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
                 data['resting_heart_rate'] = session.get('lowest_heart_rate')
                 data['average_hrv'] = session.get('average_hrv')
                 data['total_sleep'] = session.get('total_sleep_duration', 0) / 3600
+                data['efficiency'] = session.get('efficiency')
+                data['delay'] = session.get('latency')
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
