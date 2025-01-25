@@ -18,14 +18,13 @@ class CloudflareD1:
     def insert_withings_data(self, data: Dict[str, Any]) -> Dict:
         query = """
         INSERT INTO withings_data (
-            date, collected_at, weight, fat_ratio,
+            date, weight, fat_ratio,
             diastolic_bp, systolic_bp
-        ) VALUES (?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?);
         """
         
         params = [
             data["date"],
-            data["collected_at"],
             data.get("weight"),
             data.get("fat_ratio"),
             data.get("diastolic_bp"),
@@ -63,8 +62,7 @@ def fetch_withings_data(access_token: str, target_date: str) -> Dict[str, Any]:
         return None
 
     measurements = {
-        "date": target_date,
-        "collected_at": datetime.now().isoformat()
+        "date": target_date
     }
 
     for group in result["body"]["measuregrps"]:
