@@ -1,43 +1,46 @@
 name: Fetch Withings Data
 
 on:
-  workflow_dispatch:
-    inputs:
-      date:
-        description: 'Date to fetch (YYYY-MM-DD)'
-        required: false
-        default: ''
-  schedule:
-    - cron: '0 9 * * *'  # Run at 9 AM UTC daily
+ workflow_dispatch:
+   inputs:
+     date:
+       description: 'Date to fetch (YYYY-MM-DD)'
+       required: false
+       default: ''
+ schedule:
+   - cron: '0 9 * * *'  # Run at 9 AM UTC daily
 
 jobs:
-  fetch-data:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-          
-      - name: Get date
-        id: date
-        run: |
-          if [ "${{ github.event.inputs.date }}" != "" ]; then
-            echo "date=${{ github.event.inputs.date }}" >> $GITHUB_ENV
-          else
-            echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          fi
-          
-      - name: Fetch Withings data
-        run: python data-gather/collect_withings_data.py ${{ env.date }}
-        env:
-          WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
-          WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
-          WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
+ fetch-data:
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v3
+     
+     - name: Set up Python
+       uses: actions/setup-python@v4
+       with:
+         python-version: '3.x'
+         
+     - name: Install dependencies
+       run: |
+         python -m pip install --upgrade pip
+         pip install requests
+         
+     - name: Get date
+       id: date
+       run: |
+         if [ "${{ github.event.inputs.date }}" != "" ]; then
+           echo "date=${{ github.event.inputs.date }}" >> $GITHUB_ENV
+         else
+           echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+         fi
+         
+     - name: Fetch and store Withings data
+       run: python data-gather/collect_withings_data.py ${{ env.date }}
+       env:
+         WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
+         WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
+         WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
+         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+         CLOUDFLARE_D1_DB: ${{ secrets.CLOUDFLARE_D1_DB }}
+         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
