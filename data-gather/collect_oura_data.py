@@ -70,7 +70,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
             if target_sessions:
                 session = target_sessions[0]
                 # Get deep sleep duration and convert from seconds to minutes
-                data['deep_sleep_minutes'] = session.get('deep_sleep_duration', 0) / 60
+                data['deep_sleep_minutes'] = session.get('deep_sleep_duration')
                 if session.get('bedtime_start'):
                     dt = datetime.fromisoformat(session['bedtime_start'].replace('Z', '+00:00'))
                     data['bedtime_start_date'] = dt.date().isoformat()
