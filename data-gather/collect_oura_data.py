@@ -17,9 +17,9 @@ class CloudflareD1:
     def insert_oura_data(self, data: Dict[str, Any]) -> Dict:
         query = """
         INSERT INTO oura_data (
-            date, collected_at, deep_sleep_minutes, sleep_score,
-            bedtime_start_date, bedtime_start_time, resting_heart_rate,
-            average_hrv, total_sleep, spo2_avg
+            date, collected_at, deep_sleep_minutes,
+            sleep_score, bedtime_start_date, bedtime_start_time,
+            resting_heart_rate, average_hrv, total_sleep, spo2_avg
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
@@ -56,20 +56,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     
     try:
         response = requests.get(
-            'https://api.ouraring.com/v2/usercollection/daily_sleep',
-            headers=headers,
-            params={'start_date': target_date, 'end_date': target_date}
-        )
-        response.raise_for_status()
-        daily_data = response.json().get('data', [])
-        if daily_data:
-            data['deep_sleep_minutes'] = daily_data[0]['contributors'].get('deep_sleep')
-            data['sleep_score'] = daily_data[0].get('score')
-    except Exception as e:
-        print(f"Error fetching daily sleep data: {e}")
-    
-    try:
-        response = requests.get(
             'https://api.ouraring.com/v2/usercollection/sleep',
             headers=headers,
             params={'start_date': start_date, 'end_date': end_date}
@@ -83,6 +69,8 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
             ]
             if target_sessions:
                 session = target_sessions[0]
+                # Get deep sleep duration and convert from seconds to minutes
+                data['deep_sleep_minutes'] = session.get('deep_sleep_duration', 0) / 60
                 if session.get('bedtime_start'):
                     dt = datetime.fromisoformat(session['bedtime_start'].replace('Z', '+00:00'))
                     data['bedtime_start_date'] = dt.date().isoformat()
@@ -90,8 +78,10 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
                 data['resting_heart_rate'] = session.get('lowest_heart_rate')
                 data['average_hrv'] = session.get('average_hrv')
                 data['total_sleep'] = session.get('total_sleep_duration', 0) / 3600
+                # Sleep score will be calculated if needed
+                data['sleep_score'] = None
     except Exception as e:
-        print(f"Error fetching detailed sleep data: {e}")
+        print(f"Error fetching sleep data: {e}")
     
     try:
         response = requests.get(
