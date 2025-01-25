@@ -128,11 +128,12 @@ def main():
     print(json.dumps(withings_data, indent=2))
 
     if withings_data and os.environ.get("GITHUB_ACTIONS"):
-        d1_client = CloudflareD1(
-            required_vars['CLOUDFLARE_ACCOUNT_ID'],
-            required_vars['CLOUDFLARE_D1_DB'],
-            required_vars['CLOUDFLARE_API_TOKEN']
-        )
+        account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+        database_id = os.getenv('CLOUDFLARE_D1_DB')
+        bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
+        
+        if all([account_id, database_id, bearer_token]):
+            d1_client = CloudflareD1(account_id, database_id, bearer_token)
         result = d1_client.insert_withings_data(withings_data)
         print("D1 insert result:")
         print(json.dumps(result, indent=2))
