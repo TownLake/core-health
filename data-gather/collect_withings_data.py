@@ -172,9 +172,9 @@ def main():
         measurements = api.get_measurements(start_ts, end_ts)
         
         if measurements:
-            print(f"::set-output name=measurements::{measurements}")
-            for m in measurements:
-                print(m)
+            print(f"::notice::Measurements: {measurements}")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                print(f"measurements={measurements}", file=fh)
         else:
             print(f"No measurements found for {date}")
             
