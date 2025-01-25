@@ -1,0 +1,72 @@
+name: Refresh Withings Token
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'  # Run every 2 hours
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install dependencies
+        run: pip install requests
+          
+      - name: Refresh token
+        id: refresh
+        run: |
+          python - <<EOF
+          import requests
+          
+          def refresh_token(client_id, client_secret, refresh_token):
+              data = {
+                  "action": "requesttoken",
+                  "grant_type": "refresh_token",
+                  "client_id": client_id,
+                  "client_secret": client_secret,
+                  "refresh_token": refresh_token
+              }
+              
+              response = requests.post("https://wbsapi.withings.net/v2/oauth2", data=data)
+              if response.status_code == 200:
+                  result = response.json()
+                  if result["status"] == 0:
+                      return result["body"]["refresh_token"]
+              return None
+              
+          new_token = refresh_token(
+              "${{ secrets.WITHINGS_CLIENT_ID }}", 
+              "${{ secrets.WITHINGS_CLIENT_SECRET }}", 
+              "${{ secrets.WITHINGS_REFRESH_TOKEN }}"
+          )
+          
+          if new_token:
+              print(f"::add-mask::{new_token}")
+              print(f"new_token={new_token}", end="")
+          else:
+              exit(1)
+          EOF
+        
+      - name: Update repository secret
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            await github.rest.actions.createOrUpdateRepoSecret({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              secret_name: 'WITHINGS_REFRESH_TOKEN',
+              encrypted_value: Buffer.from('${{ steps.refresh.outputs.new_token }}').toString('base64')
+            });
