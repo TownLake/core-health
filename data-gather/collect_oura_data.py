@@ -94,7 +94,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
                 data['average_hrv'] = session.get('average_hrv')
                 data['total_sleep'] = session.get('total_sleep_duration', 0) / 3600
                 data['efficiency'] = session.get('efficiency')
-                data['delay'] = session.get('latency')
+                data['delay'] = int(float(session.get('latency', 0)) / 60)
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
