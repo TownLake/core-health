@@ -2,7 +2,7 @@ name: Collect Oura Data
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 8 * * *'
   workflow_dispatch:
     inputs:
       target_date:
