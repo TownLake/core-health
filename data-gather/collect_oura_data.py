@@ -123,7 +123,7 @@ def main():
         }.items() if not val]
         raise ValueError(f"Missing environment variables: {', '.join(missing)}")
 
-    target_date = os.getenv('TARGET_DATE', datetime.now().strftime('%Y-%m-%d'))
+    target_date = os.getenv('TARGET_DATE') or datetime.now().strftime('%Y-%m-%d')
 
     oura_data = fetch_oura_data(oura_token, target_date)
     print("Fetched Oura data:")
