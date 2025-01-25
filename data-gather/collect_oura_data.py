@@ -36,7 +36,12 @@ class CloudflareD1:
             data.get("spo2_avg")
         ]
 
-        response = requests.post(self.base_url, headers=self.headers, json={"sql": query, "params": params})
+        payload = {
+            "sql": query,
+            "params": params
+        }
+
+        response = requests.post(self.base_url, headers=self.headers, json=payload)
         return response.json()
 
 def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
