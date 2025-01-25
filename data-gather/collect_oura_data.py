@@ -73,7 +73,7 @@ def fetch_oura_data(token, target_date):
 
 if __name__ == '__main__':
     # Read token from environment variables
-    token = os.getenv('OURA_API_TOKEN')
+    token = os.getenv('OURA_TOKEN')
     if not token:
         raise ValueError("Oura API token is not set. Set it using the OURA_API_TOKEN environment variable.")
     
