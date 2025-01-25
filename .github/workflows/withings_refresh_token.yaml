@@ -2,8 +2,8 @@ name: Refresh Withings Token
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # Run every 2 hours
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
 
 jobs:
   refresh-token:
@@ -23,6 +23,7 @@ jobs:
         run: |
           python - <<EOF
           import requests
+          import os
           
           def refresh_token(client_id, client_secret, refresh_token):
               data = {
@@ -48,25 +49,14 @@ jobs:
           
           if new_token:
               print(f"::add-mask::{new_token}")
-              print(f"new_token={new_token}", end="")
+              print(f"new_token={new_token}")
           else:
               exit(1)
           EOF
         
-      - name: Update repository secret
-        uses: actions/create-github-app-token@v1
-        id: app-token
+      - name: Update Secret
+        uses: gliech/create-github-secret-action@v1
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          
-      - uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            await github.rest.actions.createOrUpdateRepoSecret({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              secret_name: 'WITHINGS_REFRESH_TOKEN',
-              encrypted_value: Buffer.from('${{ steps.refresh.outputs.new_token }}').toString('base64')
-            });
+          name: WITHINGS_REFRESH_TOKEN
+          value: ${{ steps.refresh.outputs.new_token }}
+          pa_token: ${{ secrets.GH_PAT }}
