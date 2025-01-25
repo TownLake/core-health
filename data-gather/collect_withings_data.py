@@ -84,7 +84,7 @@ class WithingsAPI:
                 return True
         return False
 
-    def get_measurements(self, start_date=None, end_date=None):
+    def get_measurements(self, startdate=None, enddate=None):
         if not self.access_token:
             return None
             
@@ -92,13 +92,10 @@ class WithingsAPI:
         headers = {"Authorization": f"Bearer {self.access_token}"}
         data = {
             "action": "getmeas",
-            "meastypes": "1,6,9,10"
+            "meastypes": "1,6,9,10",
+            "startdate": startdate,
+            "enddate": enddate
         }
-        
-        if start_date:
-            data["startdate"] = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp())
-        if end_date:
-            data["enddate"] = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp())
             
         response = requests.post(endpoint, headers=headers, data=data)
         if response.status_code == 200:
@@ -172,7 +169,7 @@ def main():
         }
         print(f"Request data: {data}")
         
-        measurements = api.get_measurements(date, date)
+        measurements = api.get_measurements(start_ts, end_ts)
         
         if measurements:
             print(f"::set-output name=measurements::{measurements}")
