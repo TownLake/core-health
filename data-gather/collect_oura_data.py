@@ -70,7 +70,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
             if target_sessions:
                 session = target_sessions[0]
                 # Get deep sleep duration and convert from seconds to minutes
-                data['deep_sleep_minutes'] = round(float(session.get('deep_sleep_duration', 0)) / 60, 1)
+                data['deep_sleep_minutes'] = int(float(session.get('deep_sleep_duration', 0)) / 60)
                 if session.get('bedtime_start'):
                     dt = datetime.fromisoformat(session['bedtime_start'].replace('Z', '+00:00'))
                     data['bedtime_start_date'] = dt.date().isoformat()
@@ -79,7 +79,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
                 data['average_hrv'] = session.get('average_hrv')
                 data['total_sleep'] = session.get('total_sleep_duration', 0) / 3600
                 # Sleep score will be calculated if needed
-                data['sleep_score'] = None
+                data['sleep_score'] = session.get('score')
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
