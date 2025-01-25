@@ -73,7 +73,7 @@ def fetch_oura_data(token, target_date):
 
 if __name__ == '__main__':
     # Read token from environment variables
-    token = os.getenv('OURA_TOKEN')
+    token = os.getenv('OURA_API_TOKEN')
     if not token:
         raise ValueError("Oura API token is not set. Set it using the OURA_API_TOKEN environment variable.")
     
@@ -81,8 +81,14 @@ if __name__ == '__main__':
     target_date = os.getenv('TARGET_DATE', datetime.now().strftime('%Y-%m-%d'))
     
     try:
-        # Fetch data and save to a file
+        # Fetch data
         result = fetch_oura_data(token, target_date)
+        
+        # Print the fetched data for GitHub Action logs
+        print("Fetched Oura data:")
+        print(json.dumps(result, indent=2))
+        
+        # Save the data to a file
         output_file = 'oura_data.json'
         with open(output_file, 'w') as f:
             json.dump(result, f, indent=2)
