@@ -158,6 +158,20 @@ def main():
             sys.exit(1)
             
         date = os.environ.get("date", datetime.now().strftime("%Y-%m-%d"))
+        print(f"Fetching data for date: {date}")
+        
+        # Convert date to Unix timestamp
+        start_ts = int(datetime.strptime(date, "%Y-%m-%d").timestamp())
+        end_ts = start_ts + 86400  # Add 24 hours
+        
+        data = {
+            "action": "getmeas",
+            "meastypes": "1,6,9,10",
+            "startdate": start_ts,
+            "enddate": end_ts
+        }
+        print(f"Request data: {data}")
+        
         measurements = api.get_measurements(date, date)
         
         if measurements:
