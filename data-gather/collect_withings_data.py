@@ -1,133 +1,200 @@
-name: Collect Withings Data
+import requests
+import http.server
+import webbrowser
+from datetime import datetime, timedelta
+from urllib.parse import urlparse, parse_qs
+import os
+import sys
 
-on:
-  schedule:
-    - cron: '0 10 * * *'
-  workflow_dispatch:
-    inputs:
-      target_date:
-        description: 'Target date (YYYY-MM-DD format)'
-        required: false
-        default: ''
+class AuthHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"Auth complete - you can close this window")
+        
+        query = urlparse(self.path).query
+        params = parse_qs(query)
+        if 'code' in params:
+            self.server.auth_code = params['code'][0]
 
-jobs:
-  collect-data:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests
+class WithingsAPI:
+    AUTH_URL = "https://account.withings.com/oauth2_user/authorize2"
+    TOKEN_URL = "https://wbsapi.withings.net/v2/oauth2"
+    API_URL = "https://wbsapi.withings.net"
 
-    - name: Create data collection script
-      run: |
-        mkdir -p scripts
-        cat > scripts/withings_collector.py << 'EOL'
-        import os
-        import sys
-        import json
-        import time
-        from datetime import datetime
-        import requests
+    def __init__(self, client_id, client_secret):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.redirect_uri = "http://localhost:8080"
+        self.access_token = None
+        self.refresh_token = None
 
-        def get_withings_token():
-            token_url = "https://wbsapi.withings.net/v2/oauth2"
-            data = {
-                "action": "requesttoken",
-                "client_id": os.environ["WITHINGS_CLIENT_ID"],
-                "client_secret": os.environ["WITHINGS_CLIENT_SECRET"],
-                "grant_type": "refresh_token",
-                "refresh_token": os.environ["WITHINGS_REFRESH_TOKEN"]
-            }
+    def get_auth_code(self):
+        server = http.server.HTTPServer(('localhost', 8080), AuthHandler)
+        server.auth_code = None
+        
+        auth_url = f"{self.AUTH_URL}?response_type=code&client_id={self.client_id}&scope=user.metrics&redirect_uri={self.redirect_uri}&state=withings_auth"
+        webbrowser.open(auth_url)
+        
+        print("Waiting for authorization...")
+        server.handle_request()
+        auth_code = server.auth_code
+        server.server_close()
+        return auth_code
+
+    def authenticate(self):
+        auth_code = self.get_auth_code()
+        if not auth_code:
+            return False
+
+        data = {
+            "action": "requesttoken",
+            "grant_type": "authorization_code",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": auth_code,
+            "redirect_uri": self.redirect_uri
+        }
+        
+        response = requests.post(self.TOKEN_URL, data=data)
+        if response.status_code == 200:
+            auth_data = response.json()
+            if auth_data["status"] == 0:
+                self.access_token = auth_data["body"]["access_token"]
+                self.refresh_token = auth_data["body"]["refresh_token"]
+                return True
+        return False
+
+    def refresh_access_token(self, refresh_token):
+        data = {
+            "action": "requesttoken",
+            "grant_type": "refresh_token",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "refresh_token": refresh_token
+        }
+        
+        response = requests.post(self.TOKEN_URL, data=data)
+        if response.status_code == 200:
+            auth_data = response.json()
+            if auth_data["status"] == 0:
+                self.access_token = auth_data["body"]["access_token"]
+                self.refresh_token = auth_data["body"]["refresh_token"]
+                return True
+        return False
+
+    def get_measurements(self, startdate=None, enddate=None):
+        if not self.access_token:
+            return None
             
-            try:
-                response = requests.post(token_url, data=data)
-                response.raise_for_status()
-                result = response.json()
-                print("Token response:", json.dumps(result), file=sys.stderr)  # Debug output
-                return result["body"]["access_token"]
-            except Exception as e:
-                print(f"Error getting token: {str(e)}", file=sys.stderr)
-                print("Response content:", response.text, file=sys.stderr)
-                raise
-
-        def get_withings_data(token, target_date=None):
-            if target_date:
-                start_date = int(datetime.strptime(target_date, "%Y-%m-%d").timestamp())
-            else:
-                start_date = int(time.time()) - 86400
-            end_date = start_date + 86400
+        endpoint = f"{self.API_URL}/measure"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        data = {
+            "action": "getmeas",
+            "meastypes": "1,6,9,10",
+            "startdate": startdate,
+            "enddate": enddate
+        }
             
-            url = "https://wbsapi.withings.net/measure"
-            headers = {"Authorization": f"Bearer {token}"}
-            data = {
-                "action": "getmeas",
-                "meastypes": "1,6",
-                "startdate": start_date,
-                "enddate": end_date
-            }
-            response = requests.post(url, headers=headers, data=data)
-            response.raise_for_status()
-            return response.json()["body"]["measuregrps"]
-
-        def process_measurements(measures):
-            processed_data = {}
-            for group in measures:
-                date = datetime.fromtimestamp(group["date"]).strftime("%Y-%m-%d")
-                if date not in processed_data:
-                    processed_data[date] = {"weight": None, "fat_ratio": None}
-                for measure in group["measures"]:
-                    if measure["type"] == 1:
-                        processed_data[date]["weight"] = measure["value"] * (10 ** measure["unit"])
-                    elif measure["type"] == 6:
-                        processed_data[date]["fat_ratio"] = measure["value"] * (10 ** measure["unit"])
-            return processed_data
-
-        def main():
-            # Validate environment variables
-            required_vars = ["WITHINGS_CLIENT_ID", "WITHINGS_CLIENT_SECRET", "WITHINGS_REFRESH_TOKEN"]
-            for var in required_vars:
-                if not os.environ.get(var):
-                    print(f"Missing required environment variable: {var}", file=sys.stderr)
-                    sys.exit(1)
+        response = requests.post(endpoint, headers=headers, data=data)
+        if response.status_code == 200:
+            return self._parse_measurements(response.json())
+        return None
+        
+    def _parse_measurements(self, response_data):
+        if response_data["status"] != 0:
+            return None
+            
+        measurements_dict = {}
+        for group in response_data["body"]["measuregrps"]:
+            date = datetime.fromtimestamp(group["date"]).strftime("%Y-%m-%d")
+            
+            if date not in measurements_dict:
+                measurements_dict[date] = {"date": date}
+            
+            for measure in group["measures"]:
+                value = measure["value"] * (10 ** measure["unit"])
+                if measure["type"] == 1:
+                    measurements_dict[date]["weight"] = int(value * 2.20462)
+                elif measure["type"] == 6:
+                    measurements_dict[date]["fat_ratio"] = round(value, 1)
+                elif measure["type"] == 9:
+                    measurements_dict[date]["diastolic_bp"] = value
+                elif measure["type"] == 10:
+                    measurements_dict[date]["systolic_bp"] = value
                     
-            target_date = sys.argv[1] if len(sys.argv) > 1 else None
-            token = get_withings_token()
-            measurements = get_withings_data(token, target_date)
-            data = process_measurements(measurements)
-            print(json.dumps(data))
+        measurements = list(measurements_dict.values())
+        return measurements
 
-        if __name__ == "__main__":
-            main()
-        EOL
-
-    - name: Install Wrangler
-      run: npm install -g wrangler
-        
-    - name: Configure Wrangler
-      run: |
-        echo "CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}" >> $GITHUB_ENV
-        echo "CLOUDFLARE_ACCOUNT_ID=${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" >> $GITHUB_ENV
+def get_refresh_token():
+    client_id = input("Enter your client ID: ")
+    client_secret = input("Enter your client secret: ")
     
-    - name: Run data collection and store in KV
-      env:
-        WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
-        WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
-        WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
-      run: |
-        echo "Environment check:"
-        if [ -z "$WITHINGS_REFRESH_TOKEN" ]; then
-          echo "WITHINGS_REFRESH_TOKEN is not set"
-          exit 1
-        fi
+    api = WithingsAPI(client_id, client_secret)
+    if api.authenticate():
+        print("\nAuth successful! Use these tokens in your GitHub Actions:")
+        print(f"\nRefresh Token: {api.refresh_token}")
+    else:
+        print("Authentication failed")
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--get-token":
+        get_refresh_token()
+        return
+
+    # GitHub Actions mode
+    if os.environ.get("GITHUB_ACTIONS"):
+        client_id = os.environ["WITHINGS_CLIENT_ID"]
+        client_secret = os.environ["WITHINGS_CLIENT_SECRET"]
+        refresh_token = os.environ["WITHINGS_REFRESH_TOKEN"]
         
-        DATA=$(python scripts/withings_collector.py ${{ github.event.inputs.target_date }})
-        echo "$DATA" | wrangler kv:key put --binding=WITHINGS_DATA "withings_data" -
+        api = WithingsAPI(client_id, client_secret)
+        if not api.refresh_access_token(refresh_token):
+            print("Failed to refresh token")
+            sys.exit(1)
+            
+        date = os.environ.get("date", datetime.now().strftime("%Y-%m-%d"))
+        print(f"Fetching data for date: {date}")
+        
+        # Convert date to Unix timestamp
+        start_ts = int(datetime.strptime(date, "%Y-%m-%d").timestamp())
+        end_ts = start_ts + 86400  # Add 24 hours
+        
+        data = {
+            "action": "getmeas",
+            "meastypes": "1,6,9,10",
+            "startdate": start_ts,
+            "enddate": end_ts
+        }
+        print(f"Request data: {data}")
+        
+        measurements = api.get_measurements(start_ts, end_ts)
+        
+        if measurements:
+            print(f"::notice::Measurements: {measurements}")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                print(f"measurements={measurements}", file=fh)
+        else:
+            print(f"No measurements found for {date}")
+            
+    # Local mode
+    else:
+        client_id = "YOUR_CLIENT_ID"
+        client_secret = "YOUR_CLIENT_SECRET"
+        
+        api = WithingsAPI(client_id, client_secret)
+        if api.authenticate():
+            end_date = datetime.now().strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            
+            measurements = api.get_measurements(start_date, end_date)
+            if measurements:
+                print("\nMeasurements for last 30 days:")
+                for m in measurements:
+                    print(m)
+        else:
+            print("Authentication failed")
+
+if __name__ == "__main__":
+    main()
