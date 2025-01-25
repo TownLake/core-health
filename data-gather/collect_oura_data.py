@@ -56,6 +56,19 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     
     try:
         response = requests.get(
+            'https://api.ouraring.com/v2/usercollection/daily_sleep',
+            headers=headers,
+            params={'start_date': target_date, 'end_date': target_date}
+        )
+        response.raise_for_status()
+        daily_data = response.json().get('data', [])
+        if daily_data:
+            data['sleep_score'] = daily_data[0].get('score')
+    except Exception as e:
+        print(f"Error fetching daily sleep score: {e}")
+    
+    try:
+        response = requests.get(
             'https://api.ouraring.com/v2/usercollection/sleep',
             headers=headers,
             params={'start_date': start_date, 'end_date': end_date}
@@ -69,7 +82,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
             ]
             if target_sessions:
                 session = target_sessions[0]
-                # Get deep sleep duration and convert from seconds to minutes
                 data['deep_sleep_minutes'] = int(float(session.get('deep_sleep_duration', 0)) / 60)
                 if session.get('bedtime_start'):
                     dt = datetime.fromisoformat(session['bedtime_start'].replace('Z', '+00:00'))
@@ -78,8 +90,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
                 data['resting_heart_rate'] = session.get('lowest_heart_rate')
                 data['average_hrv'] = session.get('average_hrv')
                 data['total_sleep'] = session.get('total_sleep_duration', 0) / 3600
-                # Sleep score will be calculated if needed
-                data['sleep_score'] = session.get('score')
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
