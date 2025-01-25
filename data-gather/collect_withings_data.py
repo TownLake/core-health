@@ -1,200 +1,139 @@
-import requests
-import http.server
-import webbrowser
-from datetime import datetime, timedelta
-from urllib.parse import urlparse, parse_qs
 import os
-import sys
+import requests
+from datetime import datetime
+import json
+from typing import Dict, Any
 
-class AuthHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(b"Auth complete - you can close this window")
-        
-        query = urlparse(self.path).query
-        params = parse_qs(query)
-        if 'code' in params:
-            self.server.auth_code = params['code'][0]
-
-class WithingsAPI:
-    AUTH_URL = "https://account.withings.com/oauth2_user/authorize2"
-    TOKEN_URL = "https://wbsapi.withings.net/v2/oauth2"
-    API_URL = "https://wbsapi.withings.net"
-
-    def __init__(self, client_id, client_secret):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_uri = "http://localhost:8080"
-        self.access_token = None
-        self.refresh_token = None
-
-    def get_auth_code(self):
-        server = http.server.HTTPServer(('localhost', 8080), AuthHandler)
-        server.auth_code = None
-        
-        auth_url = f"{self.AUTH_URL}?response_type=code&client_id={self.client_id}&scope=user.metrics&redirect_uri={self.redirect_uri}&state=withings_auth"
-        webbrowser.open(auth_url)
-        
-        print("Waiting for authorization...")
-        server.handle_request()
-        auth_code = server.auth_code
-        server.server_close()
-        return auth_code
-
-    def authenticate(self):
-        auth_code = self.get_auth_code()
-        if not auth_code:
-            return False
-
-        data = {
-            "action": "requesttoken",
-            "grant_type": "authorization_code",
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "code": auth_code,
-            "redirect_uri": self.redirect_uri
+class CloudflareD1:
+    def __init__(self, account_id: str, database_id: str, bearer_token: str):
+        self.account_id = account_id
+        self.database_id = database_id
+        self.base_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query"
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {bearer_token}"
         }
-        
-        response = requests.post(self.TOKEN_URL, data=data)
-        if response.status_code == 200:
-            auth_data = response.json()
-            if auth_data["status"] == 0:
-                self.access_token = auth_data["body"]["access_token"]
-                self.refresh_token = auth_data["body"]["refresh_token"]
-                return True
-        return False
 
-    def refresh_access_token(self, refresh_token):
-        data = {
-            "action": "requesttoken",
-            "grant_type": "refresh_token",
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "refresh_token": refresh_token
+    def insert_withings_data(self, data: Dict[str, Any]) -> Dict:
+        query = """
+        INSERT INTO withings_data (
+            date, collected_at, weight, fat_ratio,
+            diastolic_bp, systolic_bp
+        ) VALUES (?, ?, ?, ?, ?, ?);
+        """
+        
+        params = [
+            data["date"],
+            data["collected_at"],
+            data.get("weight"),
+            data.get("fat_ratio"),
+            data.get("diastolic_bp"),
+            data.get("systolic_bp")
+        ]
+
+        payload = {
+            "sql": query,
+            "params": params
         }
-        
-        response = requests.post(self.TOKEN_URL, data=data)
-        if response.status_code == 200:
-            auth_data = response.json()
-            if auth_data["status"] == 0:
-                self.access_token = auth_data["body"]["access_token"]
-                self.refresh_token = auth_data["body"]["refresh_token"]
-                return True
-        return False
 
-    def get_measurements(self, startdate=None, enddate=None):
-        if not self.access_token:
-            return None
-            
-        endpoint = f"{self.API_URL}/measure"
-        headers = {"Authorization": f"Bearer {self.access_token}"}
-        data = {
-            "action": "getmeas",
-            "meastypes": "1,6,9,10",
-            "startdate": startdate,
-            "enddate": enddate
-        }
-            
-        response = requests.post(endpoint, headers=headers, data=data)
-        if response.status_code == 200:
-            return self._parse_measurements(response.json())
-        return None
-        
-    def _parse_measurements(self, response_data):
-        if response_data["status"] != 0:
-            return None
-            
-        measurements_dict = {}
-        for group in response_data["body"]["measuregrps"]:
-            date = datetime.fromtimestamp(group["date"]).strftime("%Y-%m-%d")
-            
-            if date not in measurements_dict:
-                measurements_dict[date] = {"date": date}
-            
-            for measure in group["measures"]:
-                value = measure["value"] * (10 ** measure["unit"])
-                if measure["type"] == 1:
-                    measurements_dict[date]["weight"] = int(value * 2.20462)
-                elif measure["type"] == 6:
-                    measurements_dict[date]["fat_ratio"] = round(value, 1)
-                elif measure["type"] == 9:
-                    measurements_dict[date]["diastolic_bp"] = value
-                elif measure["type"] == 10:
-                    measurements_dict[date]["systolic_bp"] = value
-                    
-        measurements = list(measurements_dict.values())
-        return measurements
+        response = requests.post(self.base_url, headers=self.headers, json=payload)
+        return response.json()
 
-def get_refresh_token():
-    client_id = input("Enter your client ID: ")
-    client_secret = input("Enter your client secret: ")
+def fetch_withings_data(access_token: str, target_date: str) -> Dict[str, Any]:
+    start_ts = int(datetime.strptime(target_date, "%Y-%m-%d").timestamp())
+    end_ts = start_ts + 86400  # Add 24 hours
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    endpoint = "https://wbsapi.withings.net/measure"
     
-    api = WithingsAPI(client_id, client_secret)
-    if api.authenticate():
-        print("\nAuth successful! Use these tokens in your GitHub Actions:")
-        print(f"\nRefresh Token: {api.refresh_token}")
-    else:
-        print("Authentication failed")
+    data = {
+        "action": "getmeas",
+        "meastypes": "1,6,9,10",
+        "startdate": start_ts,
+        "enddate": end_ts
+    }
+
+    response = requests.post(endpoint, headers=headers, data=data)
+    if response.status_code != 200:
+        return None
+
+    result = response.json()
+    if result["status"] != 0:
+        return None
+
+    measurements = {
+        "date": target_date,
+        "collected_at": datetime.now().isoformat()
+    }
+
+    for group in result["body"]["measuregrps"]:
+        for measure in group["measures"]:
+            value = measure["value"] * (10 ** measure["unit"])
+            if measure["type"] == 1:
+                measurements["weight"] = int(value * 2.20462)  # Convert to lbs
+            elif measure["type"] == 6:
+                measurements["fat_ratio"] = round(value, 1)
+            elif measure["type"] == 9:
+                measurements["diastolic_bp"] = value
+            elif measure["type"] == 10:
+                measurements["systolic_bp"] = value
+
+    return measurements
+
+def refresh_token(client_id: str, client_secret: str, refresh_token: str) -> str:
+    data = {
+        "action": "requesttoken",
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token
+    }
+    
+    response = requests.post("https://wbsapi.withings.net/v2/oauth2", data=data)
+    if response.status_code == 200:
+        result = response.json()
+        if result["status"] == 0:
+            return result["body"]["access_token"]
+    return None
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "--get-token":
-        get_refresh_token()
-        return
+    required_vars = {
+        'WITHINGS_CLIENT_ID': os.getenv('WITHINGS_CLIENT_ID'),
+        'WITHINGS_CLIENT_SECRET': os.getenv('WITHINGS_CLIENT_SECRET'),
+        'WITHINGS_REFRESH_TOKEN': os.getenv('WITHINGS_REFRESH_TOKEN'),
+        'CLOUDFLARE_ACCOUNT_ID': os.getenv('CLOUDFLARE_ACCOUNT_ID'),
+        'CLOUDFLARE_D1_DB': os.getenv('CLOUDFLARE_D1_DB'),
+        'CLOUDFLARE_API_TOKEN': os.getenv('CLOUDFLARE_API_TOKEN')
+    }
+    
+    missing = [var for var, val in required_vars.items() if not val]
+    if missing:
+        raise ValueError(f"Missing environment variables: {', '.join(missing)}")
 
-    # GitHub Actions mode
-    if os.environ.get("GITHUB_ACTIONS"):
-        client_id = os.environ["WITHINGS_CLIENT_ID"]
-        client_secret = os.environ["WITHINGS_CLIENT_SECRET"]
-        refresh_token = os.environ["WITHINGS_REFRESH_TOKEN"]
-        
-        api = WithingsAPI(client_id, client_secret)
-        if not api.refresh_access_token(refresh_token):
-            print("Failed to refresh token")
-            sys.exit(1)
-            
-        date = os.environ.get("date", datetime.now().strftime("%Y-%m-%d"))
-        print(f"Fetching data for date: {date}")
-        
-        # Convert date to Unix timestamp
-        start_ts = int(datetime.strptime(date, "%Y-%m-%d").timestamp())
-        end_ts = start_ts + 86400  # Add 24 hours
-        
-        data = {
-            "action": "getmeas",
-            "meastypes": "1,6,9,10",
-            "startdate": start_ts,
-            "enddate": end_ts
-        }
-        print(f"Request data: {data}")
-        
-        measurements = api.get_measurements(start_ts, end_ts)
-        
-        if measurements:
-            print(f"::notice::Measurements: {measurements}")
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
-                print(f"measurements={measurements}", file=fh)
-        else:
-            print(f"No measurements found for {date}")
-            
-    # Local mode
-    else:
-        client_id = "YOUR_CLIENT_ID"
-        client_secret = "YOUR_CLIENT_SECRET"
-        
-        api = WithingsAPI(client_id, client_secret)
-        if api.authenticate():
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-            
-            measurements = api.get_measurements(start_date, end_date)
-            if measurements:
-                print("\nMeasurements for last 30 days:")
-                for m in measurements:
-                    print(m)
-        else:
-            print("Authentication failed")
+    target_date = os.getenv('TARGET_DATE') or datetime.now().strftime('%Y-%m-%d')
+
+    access_token = refresh_token(
+        required_vars['WITHINGS_CLIENT_ID'],
+        required_vars['WITHINGS_CLIENT_SECRET'],
+        required_vars['WITHINGS_REFRESH_TOKEN']
+    )
+    
+    if not access_token:
+        raise ValueError("Failed to refresh access token")
+
+    withings_data = fetch_withings_data(access_token, target_date)
+    print("Fetched Withings data:")
+    print(json.dumps(withings_data, indent=2))
+
+    if withings_data:
+        d1_client = CloudflareD1(
+            required_vars['CLOUDFLARE_ACCOUNT_ID'],
+            required_vars['CLOUDFLARE_D1_DB'],
+            required_vars['CLOUDFLARE_API_TOKEN']
+        )
+        result = d1_client.insert_withings_data(withings_data)
+        print("D1 insert result:")
+        print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":
     main()
