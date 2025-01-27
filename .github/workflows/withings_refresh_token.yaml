@@ -1,46 +1,61 @@
-import requests
-import os
-import json
+name: Refresh Withings Token
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
 
-def refresh_token(client_id, client_secret, refresh_token):
-    if not all([client_id, client_secret, refresh_token]):
-        print("Error: Missing required credentials")
-        return None
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install dependencies
+        run: pip install requests
+          
+      - name: Refresh token
+        id: refresh
+        run: |
+          python - <<EOF
+          import requests
+          import os
+          
+          def refresh_token(client_id, client_secret, refresh_token):
+              data = {
+                  "action": "requesttoken",
+                  "grant_type": "refresh_token",
+                  "client_id": client_id,
+                  "client_secret": client_secret,
+                  "refresh_token": refresh_token
+              }
+              
+              response = requests.post("https://wbsapi.withings.net/v2/oauth2", data=data)
+              if response.status_code == 200:
+                  result = response.json()
+                  if result["status"] == 0:
+                      return result["body"]["refresh_token"]
+              return None
+              
+          new_token = refresh_token(
+              "${{ secrets.WITHINGS_CLIENT_ID }}", 
+              "${{ secrets.WITHINGS_CLIENT_SECRET }}", 
+              "${{ secrets.WITHINGS_REFRESH_TOKEN }}"
+          )
+          
+          if new_token:
+              print(f"::add-mask::{new_token}")
+              print(f"new_token={new_token}")
+          else:
+              exit(1)
+          EOF
         
-    data = {
-        "action": "requesttoken",
-        "grant_type": "refresh_token",
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "refresh_token": refresh_token
-    }
-    
-    try:
-        response = requests.post("https://wbsapi.withings.net/v2/oauth2", data=data)
-        print(f"Response status code: {response.status_code}")
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"API response status: {result.get('status')}")
-            if result.get("status") == 0:
-                return result["body"]["refresh_token"]
-            else:
-                print(f"API error: {json.dumps(result, indent=2)}")
-        else:
-            print(f"HTTP error: {response.text}")
-    except Exception as e:
-        print(f"Exception occurred: {str(e)}")
-    return None
-
-new_token = refresh_token(
-    "${{ secrets.WITHINGS_CLIENT_ID }}", 
-    "${{ secrets.WITHINGS_CLIENT_SECRET }}", 
-    "${{ secrets.WITHINGS_REFRESH_TOKEN }}"
-)
-
-if new_token:
-    print(f"::add-mask::{new_token}")
-    print(f"new_token={new_token}")
-else:
-    print("Failed to refresh token")
-    exit(1)
+      - name: Update Secret
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: WITHINGS_REFRESH_TOKEN
+          value: ${{ steps.refresh.outputs.new_token }}
+          pa_token: ${{ secrets.GH_PAT }}
