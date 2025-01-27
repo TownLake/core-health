@@ -24,19 +24,20 @@ class CloudflareD1:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
+        # Ensure all required fields exist with defaults
         params = [
-            data["date"],
-            data["collected_at"],
-            data["deep_sleep_minutes"],
-            data["sleep_score"],
-            data["bedtime_start_date"],
-            data["bedtime_start_time"],
-            data["resting_heart_rate"],
-            data["average_hrv"],
-            data["total_sleep"],
-            data["spo2_avg"],
-            data["efficiency"],
-            data["delay"]
+            data.get("date"),
+            data.get("collected_at"),
+            data.get("deep_sleep_minutes"),
+            data.get("sleep_score"),
+            data.get("bedtime_start_date"),
+            data.get("bedtime_start_time"),
+            data.get("resting_heart_rate"),
+            data.get("average_hrv"),
+            data.get("total_sleep"),
+            data.get("spo2_avg", None),  # Default to None if SPO2 is missing
+            data.get("efficiency"),
+            data.get("delay")
         ]
 
         payload = {
@@ -69,6 +70,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
             data['sleep_score'] = daily_data[0].get('score')
     except Exception as e:
         print(f"Error fetching daily sleep score: {e}")
+        data['sleep_score'] = None
     
     try:
         response = requests.get(
@@ -108,8 +110,11 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         spo2_data = response.json().get('data', [])
         if spo2_data:
             data['spo2_avg'] = spo2_data[0].get('spo2_percentage', {}).get('average')
+        else:
+            data['spo2_avg'] = None  # Explicitly set to None if no SPO2 data
     except Exception as e:
         print(f"Error fetching SPO2 data: {e}")
+        data['spo2_avg'] = None  # Set to None on error
     
     return data
 
