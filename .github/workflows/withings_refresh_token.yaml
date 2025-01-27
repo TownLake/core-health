@@ -23,8 +23,21 @@ jobs:
           python - <<EOF
           import requests
           import os
+          import json
+          import sys
+          
+          def debug_print(message):
+              print(f"DEBUG: {message}", file=sys.stderr)
           
           def refresh_token(client_id, client_secret, refresh_token):
+              debug_print(f"Client ID length: {len(client_id) if client_id else 0}")
+              debug_print(f"Client Secret length: {len(client_secret) if client_secret else 0}")
+              debug_print(f"Refresh Token length: {len(refresh_token) if refresh_token else 0}")
+              
+              if not all([client_id, client_secret, refresh_token]):
+                  debug_print("Error: One or more credentials are empty")
+                  return None
+                  
               data = {
                   "action": "requesttoken",
                   "grant_type": "refresh_token",
@@ -33,27 +46,52 @@ jobs:
                   "refresh_token": refresh_token
               }
               
-              response = requests.post("https://wbsapi.withings.net/v2/oauth2", data=data)
-              if response.status_code == 200:
-                  result = response.json()
-                  if result["status"] == 0:
-                      return result["body"]["refresh_token"]
+              try:
+                  debug_print("Making request to Withings API...")
+                  response = requests.post("https://wbsapi.withings.net/v2/oauth2", data=data)
+                  debug_print(f"Response status code: {response.status_code}")
+                  
+                  if response.status_code == 200:
+                      result = response.json()
+                      debug_print(f"API response status: {result.get('status')}")
+                      
+                      if result.get("status") == 0:
+                          debug_print("Successfully got new refresh token")
+                          return result["body"]["refresh_token"]
+                      else:
+                          error_msg = json.dumps(result, indent=2)
+                          debug_print(f"API error response: {error_msg}")
+                  else:
+                      debug_print(f"HTTP error response: {response.text}")
+              except Exception as e:
+                  debug_print(f"Exception occurred: {str(e)}")
               return None
-              
-          new_token = refresh_token(
-              "${{ secrets.WITHINGS_CLIENT_ID }}", 
-              "${{ secrets.WITHINGS_CLIENT_SECRET }}", 
-              "${{ secrets.WITHINGS_REFRESH_TOKEN }}"
-          )
+          
+          # Fetch secrets from environment variables instead of direct string interpolation
+          client_id = os.environ.get('WITHINGS_CLIENT_ID', '')
+          client_secret = os.environ.get('WITHINGS_CLIENT_SECRET', '')
+          refresh_token = os.environ.get('WITHINGS_REFRESH_TOKEN', '')
+          
+          debug_print("Starting token refresh process...")
+          new_token = refresh_token(client_id, client_secret, refresh_token)
           
           if new_token:
+              # Mask the token in logs
               print(f"::add-mask::{new_token}")
-              print(f"new_token={new_token}")
+              # Set output for next step
+              print(f"::set-output name=new_token::{new_token}")
+              debug_print("Successfully completed token refresh")
           else:
-              exit(1)
+              debug_print("Failed to get new token")
+              sys.exit(1)
           EOF
+        env:
+          WITHINGS_CLIENT_ID: ${{ secrets.WITHINGS_CLIENT_ID }}
+          WITHINGS_CLIENT_SECRET: ${{ secrets.WITHINGS_CLIENT_SECRET }}
+          WITHINGS_REFRESH_TOKEN: ${{ secrets.WITHINGS_REFRESH_TOKEN }}
         
       - name: Update Secret
+        if: steps.refresh.outputs.new_token != ''
         uses: gliech/create-github-secret-action@v1
         with:
           name: WITHINGS_REFRESH_TOKEN
