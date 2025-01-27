@@ -29,12 +29,12 @@ jobs:
           def debug_print(message):
               print(f"DEBUG: {message}", file=sys.stderr)
           
-          def refresh_token(client_id, client_secret, refresh_token):
+          def refresh_withings_token(client_id, client_secret, current_token):  # Renamed function
               debug_print(f"Client ID length: {len(client_id) if client_id else 0}")
               debug_print(f"Client Secret length: {len(client_secret) if client_secret else 0}")
-              debug_print(f"Refresh Token length: {len(refresh_token) if refresh_token else 0}")
+              debug_print(f"Current Token length: {len(current_token) if current_token else 0}")
               
-              if not all([client_id, client_secret, refresh_token]):
+              if not all([client_id, client_secret, current_token]):
                   debug_print("Error: One or more credentials are empty")
                   return None
                   
@@ -43,7 +43,7 @@ jobs:
                   "grant_type": "refresh_token",
                   "client_id": client_id,
                   "client_secret": client_secret,
-                  "refresh_token": refresh_token
+                  "refresh_token": current_token
               }
               
               try:
@@ -67,18 +67,16 @@ jobs:
                   debug_print(f"Exception occurred: {str(e)}")
               return None
           
-          # Fetch secrets from environment variables instead of direct string interpolation
+          # Get credentials from environment
           client_id = os.environ.get('WITHINGS_CLIENT_ID', '')
           client_secret = os.environ.get('WITHINGS_CLIENT_SECRET', '')
           refresh_token = os.environ.get('WITHINGS_REFRESH_TOKEN', '')
           
           debug_print("Starting token refresh process...")
-          new_token = refresh_token(client_id, client_secret, refresh_token)
+          new_token = refresh_withings_token(client_id, client_secret, refresh_token)
           
           if new_token:
-              # Mask the token in logs
               print(f"::add-mask::{new_token}")
-              # Set output for next step
               print(f"::set-output name=new_token::{new_token}")
               debug_print("Successfully completed token refresh")
           else:
