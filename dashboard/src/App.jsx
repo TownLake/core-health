@@ -2,7 +2,9 @@ import Dashboard from './components/Dashboard'
 
 function App() {
   return (
-    <Dashboard />
+    <div className="min-h-screen bg-slate-50">
+      <Dashboard />
+    </div>
   )
 }
 
