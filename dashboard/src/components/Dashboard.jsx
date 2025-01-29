@@ -120,60 +120,45 @@ const Dashboard = () => {
     const stable = Math.abs(diff) < 0.01;
     
     // Default colors for stable trend
-    let trendColor = 'text-blue-500';
-    let lineColor = '#3b82f6'; // blue
+    const colors = {
+      stable: { text: 'text-blue-500', line: '#3b82f6' },
+      good: { text: 'text-green-500', line: '#22c55e' },
+      bad: { text: 'text-red-500', line: '#ef4444' }
+    };
 
     switch(metric) {
       case 'hrv':
-        if (stable) return { trend: 'Stable', color: trendColor, lineColor };
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
         if (diff > 0) {
-          trendColor = 'text-green-500';
-          lineColor = '#22c55e'; // green
+          return { trend: 'Increasing', color: colors.good.text, lineColor: colors.good.line };
         }
-        return { 
-          trend: diff > 0 ? 'Increasing' : 'Decreasing', 
-          color: trendColor, 
-          lineColor 
-        };
+        return { trend: 'Decreasing', color: colors.bad.text, lineColor: colors.bad.line };
         
       case 'rhr':
       case 'weight':
       case 'bodyFat':
-        if (stable) return { trend: 'Stable', color: trendColor, lineColor };
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
         if (diff < 0) {
-          trendColor = 'text-red-500';
-          lineColor = '#ef4444'; // red
+          return { trend: 'Decreasing', color: colors.good.text, lineColor: colors.good.line };
         }
-        return { 
-          trend: diff > 0 ? 'Increasing' : 'Decreasing', 
-          color: trendColor, 
-          lineColor 
-        };
+        return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
         
       case 'sleep':
         const hours = latest;
-        if (hours >= 7 && hours <= 8) {
-          trendColor = 'text-green-500';
-          lineColor = '#22c55e';
-          return { trend: 'Within target', color: trendColor, lineColor };
+        if (hours >= 7 && hours <= 8.5) {
+          return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
         }
-        trendColor = 'text-red-500';
-        lineColor = '#ef4444';
         return { 
           trend: hours < 7 ? 'Below target' : 'Above target', 
-          color: trendColor, 
-          lineColor 
+          color: colors.bad.text, 
+          lineColor: colors.bad.line 
         };
         
       case 'delay':
         if (latest >= 20) {
-          trendColor = 'text-red-500';
-          lineColor = '#ef4444';
-          return { trend: 'Above target', color: trendColor, lineColor };
+          return { trend: 'Above target', color: colors.bad.text, lineColor: colors.bad.line };
         }
-        trendColor = 'text-green-500';
-        lineColor = '#22c55e';
-        return { trend: 'Within target', color: trendColor, lineColor };
+        return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
         
       default:
         return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
