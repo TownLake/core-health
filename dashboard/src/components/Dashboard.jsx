@@ -111,13 +111,26 @@ const Dashboard = () => {
     return [...data].reverse().map(d => ({ value: d[key] }));
   };
 
+  const getAverage = (data, key, startIdx, count) => {
+    const values = data.slice(startIdx, startIdx + count)
+                      .map(d => d[key])
+                      .filter(v => v !== null && v !== undefined);
+    return values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : null;
+  };
+
   const getTrendInfo = (data, key, metric) => {
-    if (!data || data.length < 2) return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    if (!data || data.length < 10) return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
     
-    const latest = data[0][key];
-    const previous = data[1][key];
-    const diff = latest - previous;
-    const stable = Math.abs(diff) < 0.01;
+    const recentAvg = getAverage(data, key, 0, 3);  // Last 3 days
+    const previousAvg = getAverage(data, key, 3, 7); // Prior 7 days
+    
+    if (recentAvg === null || previousAvg === null) {
+      return { trend: 'Insufficient data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    }
+
+    const diff = recentAvg - previousAvg;
+    const percentChange = Math.abs(diff / previousAvg);
+    const stable = percentChange < 0.02; // 2% threshold
     
     // Default colors for stable trend
     const colors = {
