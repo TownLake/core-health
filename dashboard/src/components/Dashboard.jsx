@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "../components/ui/card";
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
 
