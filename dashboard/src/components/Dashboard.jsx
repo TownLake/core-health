@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Moon, Heart, Scale, Activity, Timer, Home, ClipboardList, Running } from 'lucide-react';
+import { Moon, Heart, Scale, Activity, Timer, Home, ClipboardList, Dumbbell } from 'lucide-react';
 
 // Metric card component
 const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500" }) => {
@@ -54,7 +54,7 @@ const NavBar = () => (
       <span className="text-xs mt-1">Journal</span>
     </div>
     <div className="flex flex-col items-center text-gray-400">
-      <Running className="w-6 h-6" />
+      <Dumbbell className="w-6 h-6" />
       <span className="text-xs mt-1">Fitness</span>
     </div>
     <div className="flex flex-col items-center text-gray-900">
