@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
 
-// Metric card component
+// Metric card component remains the same
 const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500" }) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
@@ -42,7 +42,7 @@ const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, tren
   );
 };
 
-// Theme toggle button
+// Theme toggle component remains the same
 const ThemeToggle = ({ isDark, onToggle }) => (
   <button
     onClick={onToggle}
@@ -73,30 +73,47 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Generate some sample sparkline data
-  const generateSparklineData = (baseValue, count = 10) => {
-    return Array(count).fill(null).map((_, i) => ({
-      value: baseValue + (Math.random() - 0.5) * 10
+  // Fetch data from APIs
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [ouraResponse, withingsResponse] = await Promise.all([
+          fetch('/api/oura'),
+          fetch('/api/withings')
+        ]);
+
+        const ouraData = await ouraResponse.json();
+        const withingsData = await withingsResponse.json();
+
+        // Reverse arrays so oldest data comes first in sparklines
+        setOuraData(ouraData.reverse());
+        setWithingsData(withingsData.reverse());
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Helper function to create sparkline data from historical values
+  const createSparklineData = (data, key) => {
+    return data.map(entry => ({
+      value: key === 'total_sleep' ? entry[key] / 60 : entry[key]
     }));
   };
 
-  useEffect(() => {
-    const mockOuraData = [{
-      average_hrv: 62.9,
-      resting_heart_rate: 60.6,
-      total_sleep: 444, // 7.4 hours in minutes
-      delay: 22,
-      vo2_max: 52.7
-    }];
-    
-    const mockWithingsData = [{
-      weight: 159.3,
-      fat_ratio: 10.8
-    }];
-    
-    setOuraData(mockOuraData);
-    setWithingsData(mockWithingsData);
-  }, []);
+  // Calculate trend based on latest values
+  const calculateTrend = (data, key) => {
+    if (data.length < 2) return 'No trend';
+    const latest = key === 'total_sleep' ? data[data.length - 1][key] / 60 : data[data.length - 1][key];
+    const previous = key === 'total_sleep' ? data[data.length - 2][key] / 60 : data[data.length - 2][key];
+    const diff = latest - previous;
+    return diff > 0 ? 'Increasing' : diff < 0 ? 'Decreasing' : 'Stable';
+  };
+
+  const latestOura = ouraData[ouraData.length - 1] || {};
+  const latestWithings = withingsData[withingsData.length - 1] || {};
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
@@ -108,60 +125,58 @@ const Dashboard = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MetricCard
-            title="VO₂ Max"
-            value={ouraData[0]?.vo2_max?.toFixed(1) ?? '--'}
-            unit=""
-            trend="Excellent"
-            sparklineData={generateSparklineData(52.7)}
-            icon={Activity}
-            trendColor="text-blue-500"
-          />
-          
-          <MetricCard
             title="HRV"
-            value={ouraData[0]?.average_hrv?.toFixed(1) ?? '--'}
+            value={latestOura?.average_hrv?.toFixed(1) ?? '--'}
             unit="ms"
-            trend="Stabilizing"
-            sparklineData={generateSparklineData(62.9)}
+            trend={calculateTrend(ouraData, 'average_hrv')}
+            sparklineData={createSparklineData(ouraData, 'average_hrv')}
             icon={Activity}
           />
           
           <MetricCard
             title="Resting Heart Rate"
-            value={ouraData[0]?.resting_heart_rate?.toFixed(1) ?? '--'}
+            value={latestOura?.resting_heart_rate?.toFixed(1) ?? '--'}
             unit="bpm"
-            trend="Excellent"
-            sparklineData={generateSparklineData(60.6)}
+            trend={calculateTrend(ouraData, 'resting_heart_rate')}
+            sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
             icon={Heart}
-            trendColor="text-blue-500"
           />
           
           <MetricCard
             title="Weight"
-            value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
+            value={latestWithings?.weight?.toFixed(1) ?? '--'}
             unit="lbs"
-            trend="Decreasing"
-            sparklineData={generateSparklineData(159.3)}
+            trend={calculateTrend(withingsData, 'weight')}
+            sparklineData={createSparklineData(withingsData, 'weight')}
             icon={Scale}
           />
           
           <MetricCard
+            title="Body Fat"
+            value={latestWithings?.fat_ratio?.toFixed(1) ?? '--'}
+            unit="%"
+            trend={calculateTrend(withingsData, 'fat_ratio')}
+            sparklineData={createSparklineData(withingsData, 'fat_ratio')}
+            icon={Activity}
+            trendColor="text-purple-500"
+          />
+          
+          <MetricCard
             title="Total Sleep"
-            value={ouraData[0]?.total_sleep ? (ouraData[0].total_sleep / 60).toFixed(1) : '--'}
+            value={latestOura?.total_sleep ? (latestOura.total_sleep / 60).toFixed(1) : '--'}
             unit="h"
-            trend="Normal"
-            sparklineData={generateSparklineData(7.4)}
+            trend={calculateTrend(ouraData, 'total_sleep')}
+            sparklineData={createSparklineData(ouraData, 'total_sleep')}
             icon={Moon}
           />
           
           <MetricCard
-            title="Body Fat"
-            value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
-            unit="%"
-            trend="Athletic"
-            sparklineData={generateSparklineData(10.8)}
-            icon={Activity}
-            trendColor="text-purple-500"
+            title="Sleep Delay"
+            value={latestOura?.delay ?? '--'}
+            unit="min"
+            trend={calculateTrend(ouraData, 'delay')}
+            sparklineData={createSparklineData(ouraData, 'delay')}
+            icon={Timer}
           />
         </div>
       </div>
