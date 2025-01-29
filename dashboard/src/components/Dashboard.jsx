@@ -214,7 +214,8 @@ const Dashboard = () => {
           <div className="flex gap-2">
             <button
               onClick={getAIInsights}
-              className="p-3 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              disabled={isAnalyzing}
+              className="p-3 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
             >
               <svg 
                 viewBox="0 0 24 24" 
@@ -223,15 +224,23 @@ const Dashboard = () => {
                 stroke="currentColor" 
                 strokeWidth="2"
               >
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+                <path d="M12 3C12 3 15.5 5 15.5 9C15.5 13 12 16 12 21M12 3C12 3 8.5 5 8.5 9C8.5 13 12 16 12 21M12 3L7 9M12 3L17 9" />
+                <path d="M7 15L17 15" />
               </svg>
             </button>
             <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           </div>
         </div>
-        {aiResponse && (
+        {isAnalyzing && (
           <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
-            <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">AI Health Insights</h2>
+            <div className="flex items-center justify-center text-gray-700 dark:text-gray-300">
+              Analyzing your health data...
+            </div>
+          </div>
+        )}
+        {aiResponse && !isAnalyzing && (
+          <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+            <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Health Insights</h2>
             <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{aiResponse}</p>
           </div>
         )}

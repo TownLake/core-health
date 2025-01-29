@@ -15,7 +15,7 @@ export async function onRequest(context) {
       const { ouraData, withingsData } = await request.json();
   
       // Create a prompt with the health data
-      const prompt = `You are a health insights assistant. Analyze the following health data and provide a concise, helpful summary of trends and suggestions. Focus on actionable insights.
+      const prompt = `You are a health insights assistant. Analyze the following health data and provide 2-3 sentences focusing on the most significant findings and specific, actionable recommendations.
   
   Latest metrics:
   - HRV: ${ouraData[0].average_hrv}ms
@@ -28,22 +28,39 @@ export async function onRequest(context) {
   Recent trends (comparing 3-day vs previous 7-day averages):
   ${calculateTrendSummary(ouraData, withingsData)}
   
-  Provide a 2-3 sentence analysis focused on the most noteworthy changes and specific recommendations.`;
+  Be direct and specific in your recommendations.`;
   
-      // Call Cloudflare Workers AI
-      const AI = await env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
-        messages: [{ role: 'user', content: prompt }],
-        stream: false
-      });
+      // Call Cloudflare Workers AI gateway
+      const response = await fetch(
+        `https://gateway.ai.cloudflare.com/v1/${env.CF_AI_GATEWAY}/health-analysis/workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${env.CF_AI_TOKEN}`
+          },
+          body: JSON.stringify({ prompt })
+        }
+      );
   
-      return new Response(JSON.stringify({ response: AI.response }), {
+      if (!response.ok) {
+        console.error('AI Gateway Error:', await response.text());
+        throw new Error('Failed to get AI analysis');
+      }
+  
+      const data = await response.json();
+      return new Response(JSON.stringify({ response: data.response }), {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         }
       });
     } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error('Analysis error:', error);
+      return new Response(JSON.stringify({ 
+        error: error.message,
+        details: error.toString()
+      }), {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
