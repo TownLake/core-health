@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
+import { Moon, Heart, Scale, Activity, Timer, Sun, WandSparkles } from 'lucide-react';
 
 // Metric card component
 const MetricCard = ({ 
@@ -51,7 +51,6 @@ const MetricCard = ({
   );
 };
 
-// Theme toggle remains the same
 const ThemeToggle = ({ isDark, onToggle }) => (
   <button
     onClick={onToggle}
@@ -225,16 +224,7 @@ const Dashboard = () => {
               disabled={isAnalyzing}
               className="p-3 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
             >
-              <svg 
-                viewBox="0 0 24 24" 
-                className="w-5 h-5"
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-              >
-                <path d="M12 3C12 3 15.5 5 15.5 9C15.5 13 12 16 12 21M12 3C12 3 8.5 5 8.5 9C8.5 13 12 16 12 21M12 3L7 9M12 3L17 9" />
-                <path d="M7 15L17 15" />
-              </svg>
+              <WandSparkles className="w-5 h-5" />
             </button>
             <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           </div>
