@@ -83,10 +83,18 @@ const Dashboard = () => {
         })
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analysis failed');
+      }
       
       const data = await response.json();
+      if (!data.response) {
+        throw new Error('Invalid response format');
+      }
+      
       setAiResponse(data.response);
+      console.log('AI Response:', data.response);
     } catch (error) {
       console.error('AI analysis error:', error);
       setError('Failed to get AI insights');

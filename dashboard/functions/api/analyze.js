@@ -49,7 +49,7 @@ export async function onRequest(context) {
       }
   
       const data = await response.json();
-      return new Response(JSON.stringify({ response: data.response }), {
+      return new Response(JSON.stringify({ response: data.result.response }), {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
