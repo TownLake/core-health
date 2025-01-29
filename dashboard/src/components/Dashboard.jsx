@@ -2,8 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
 
-// Metric card component remains the same
-const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500" }) => {
+// Metric card component
+const MetricCard = ({ 
+  title, 
+  value, 
+  unit, 
+  trend, 
+  sparklineData, 
+  icon: Icon, 
+  trendColor = "text-blue-500",
+  lineColor = "#94a3b8" 
+}) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
       <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
@@ -29,7 +38,7 @@ const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, tren
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#94a3b8"
+                  stroke={lineColor}
                   strokeWidth={2}
                   dot={false}
                 />
@@ -42,7 +51,7 @@ const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, tren
   );
 };
 
-// Theme toggle component remains the same
+// Theme toggle remains the same
 const ThemeToggle = ({ isDark, onToggle }) => (
   <button
     onClick={onToggle}
@@ -52,19 +61,17 @@ const ThemeToggle = ({ isDark, onToggle }) => (
   </button>
 );
 
-// Main dashboard component
 const Dashboard = () => {
   const [ouraData, setOuraData] = useState([]);
   const [withingsData, setWithingsData] = useState([]);
   const [isDark, setIsDark] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Handle theme toggle
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('dark');
   };
 
-  // Initialize theme
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDark(prefersDark);
@@ -73,7 +80,6 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Fetch data from APIs
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -82,38 +88,95 @@ const Dashboard = () => {
           fetch('/api/withings')
         ]);
 
+        if (!ouraResponse.ok || !withingsResponse.ok) {
+          throw new Error('One or more API calls failed');
+        }
+
         const ouraData = await ouraResponse.json();
         const withingsData = await withingsResponse.json();
 
-        // Reverse arrays so oldest data comes first in sparklines
-        setOuraData(ouraData.reverse());
-        setWithingsData(withingsData.reverse());
+        setOuraData(ouraData);
+        setWithingsData(withingsData);
       } catch (error) {
         console.error('Error fetching data:', error);
+        setError(error.message);
       }
     };
 
     fetchData();
   }, []);
 
-  // Helper function to create sparkline data from historical values
   const createSparklineData = (data, key) => {
-    return data.map(entry => ({
-      value: key === 'total_sleep' ? entry[key] / 60 : entry[key]
-    }));
+    if (!data || !Array.isArray(data)) return [];
+    return [...data].reverse().map(d => ({ value: d[key] }));
   };
 
-  // Calculate trend based on latest values
-  const calculateTrend = (data, key) => {
-    if (data.length < 2) return 'No trend';
-    const latest = key === 'total_sleep' ? data[data.length - 1][key] / 60 : data[data.length - 1][key];
-    const previous = key === 'total_sleep' ? data[data.length - 2][key] / 60 : data[data.length - 2][key];
-    const diff = latest - previous;
-    return diff > 0 ? 'Increasing' : diff < 0 ? 'Decreasing' : 'Stable';
+  const getAverage = (data, key, startIdx, count) => {
+    const values = data.slice(startIdx, startIdx + count)
+                      .map(d => d[key])
+                      .filter(v => v !== null && v !== undefined);
+    return values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : null;
   };
 
-  const latestOura = ouraData[ouraData.length - 1] || {};
-  const latestWithings = withingsData[withingsData.length - 1] || {};
+  const getTrendInfo = (data, key, metric) => {
+    if (!data || data.length < 10) return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    
+    const recentAvg = getAverage(data, key, 0, 3);  // Last 3 days
+    const previousAvg = getAverage(data, key, 3, 7); // Prior 7 days
+    
+    if (recentAvg === null || previousAvg === null) {
+      return { trend: 'Insufficient data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    }
+
+    const diff = recentAvg - previousAvg;
+    const percentChange = Math.abs(diff / previousAvg);
+    const stable = percentChange < 0.02; // 2% threshold
+    
+    // Default colors for stable trend
+    const colors = {
+      stable: { text: 'text-blue-500', line: '#3b82f6' },
+      good: { text: 'text-green-500', line: '#22c55e' },
+      bad: { text: 'text-red-500', line: '#ef4444' }
+    };
+
+    switch(metric) {
+      case 'hrv':
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
+        if (diff > 0) {
+          return { trend: 'Increasing', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Decreasing', color: colors.bad.text, lineColor: colors.bad.line };
+        
+      case 'rhr':
+      case 'weight':
+      case 'bodyFat':
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
+        if (diff < 0) {
+          return { trend: 'Decreasing', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
+        
+      case 'sleep':
+        const hours = latest;
+        if (hours >= 7 && hours <= 8.5) {
+          return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { 
+          trend: hours < 7 ? 'Below target' : 'Above target', 
+          color: colors.bad.text, 
+          lineColor: colors.bad.line 
+        };
+        
+      case 'delay':
+        if (latest >= 20) {
+          return { trend: 'Above target', color: colors.bad.text, lineColor: colors.bad.line };
+        }
+        return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
+        
+      default:
+        return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
@@ -123,58 +186,63 @@ const Dashboard = () => {
           <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
         </div>
         
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+            Error loading data: {error}
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MetricCard
             title="HRV"
-            value={latestOura?.average_hrv?.toFixed(1) ?? '--'}
+            value={ouraData[0]?.average_hrv?.toFixed(0) ?? '--'}
             unit="ms"
-            trend={calculateTrend(ouraData, 'average_hrv')}
+            {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
             sparklineData={createSparklineData(ouraData, 'average_hrv')}
             icon={Activity}
           />
           
           <MetricCard
             title="Resting Heart Rate"
-            value={latestOura?.resting_heart_rate?.toFixed(1) ?? '--'}
+            value={ouraData[0]?.resting_heart_rate?.toFixed(0) ?? '--'}
             unit="bpm"
-            trend={calculateTrend(ouraData, 'resting_heart_rate')}
+            {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
             sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
             icon={Heart}
           />
           
           <MetricCard
             title="Weight"
-            value={latestWithings?.weight?.toFixed(1) ?? '--'}
+            value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
             unit="lbs"
-            trend={calculateTrend(withingsData, 'weight')}
+            {...getTrendInfo(withingsData, 'weight', 'weight')}
             sparklineData={createSparklineData(withingsData, 'weight')}
             icon={Scale}
           />
           
           <MetricCard
             title="Body Fat"
-            value={latestWithings?.fat_ratio?.toFixed(1) ?? '--'}
+            value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
             unit="%"
-            trend={calculateTrend(withingsData, 'fat_ratio')}
+            {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
             sparklineData={createSparklineData(withingsData, 'fat_ratio')}
             icon={Activity}
-            trendColor="text-purple-500"
           />
           
           <MetricCard
             title="Total Sleep"
-            value={latestOura?.total_sleep ? (latestOura.total_sleep / 60).toFixed(1) : '--'}
+            value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
             unit="h"
-            trend={calculateTrend(ouraData, 'total_sleep')}
+            {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
             sparklineData={createSparklineData(ouraData, 'total_sleep')}
             icon={Moon}
           />
           
           <MetricCard
             title="Sleep Delay"
-            value={latestOura?.delay ?? '--'}
+            value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
             unit="min"
-            trend={calculateTrend(ouraData, 'delay')}
+            {...getTrendInfo(ouraData, 'delay', 'delay')}
             sparklineData={createSparklineData(ouraData, 'delay')}
             icon={Timer}
           />
