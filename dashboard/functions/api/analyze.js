@@ -15,7 +15,7 @@ export async function onRequest(context) {
       const { ouraData, withingsData } = await request.json();
   
       // Create a prompt with the health data
-      const prompt = `You are a health insights assistant. Analyze the following health data and provide 2-3 sentences focusing on the most significant findings and specific, actionable recommendations.
+      const prompt = `You are a health insights assistant. Analyze the following health data for a 34 year old male. Have a section on Vitals that covers HRV, Resting Heart Rate, Weight, Body Fat. Then a section on Sleep. Use emojis as bullet points. Provide 1-2 sentences focusing on the most significant findings and specific, actionable recommendations.
   
   Latest metrics:
   - HRV: ${ouraData[0].average_hrv}ms
