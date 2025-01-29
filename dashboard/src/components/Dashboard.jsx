@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
+import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles } from 'lucide-react';
 
 // Metric card component
 const MetricCard = ({ 
@@ -51,7 +51,6 @@ const MetricCard = ({
   );
 };
 
-// Theme toggle remains the same
 const ThemeToggle = ({ isDark, onToggle }) => (
   <button
     onClick={onToggle}
@@ -66,6 +65,42 @@ const Dashboard = () => {
   const [withingsData, setWithingsData] = useState([]);
   const [isDark, setIsDark] = useState(false);
   const [error, setError] = useState(null);
+  const [aiResponse, setAiResponse] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const getAIInsights = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ouraData,
+          withingsData
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+      
+      const data = await response.json();
+      if (!data.response) {
+        throw new Error('Invalid response format');
+      }
+      
+      setAiResponse(data.response);
+      console.log('AI Response:', data.response);
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      setError('Failed to get AI insights');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -183,8 +218,30 @@ const Dashboard = () => {
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today</h1>
-          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+          <div className="flex gap-2">
+            <button
+              onClick={getAIInsights}
+              disabled={isAnalyzing}
+              className="p-3 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+            >
+              <Sparkles className="w-5 h-5" />
+            </button>
+            <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+          </div>
         </div>
+        {isAnalyzing && (
+          <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+            <div className="flex items-center justify-center text-gray-700 dark:text-gray-300">
+              Analyzing your health data...
+            </div>
+          </div>
+        )}
+        {aiResponse && !isAnalyzing && (
+          <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+            <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Health Insights</h2>
+            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{aiResponse}</p>
+          </div>
+        )}
         
         {error && (
           <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
