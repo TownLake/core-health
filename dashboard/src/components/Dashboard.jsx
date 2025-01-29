@@ -2,8 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
 
-// Metric card component remains the same
-const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500" }) => {
+// Metric card component
+const MetricCard = ({ 
+  title, 
+  value, 
+  unit, 
+  trend, 
+  sparklineData, 
+  icon: Icon, 
+  trendColor = "text-blue-500",
+  lineColor = "#94a3b8" 
+}) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
       <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
@@ -29,7 +38,7 @@ const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, tren
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#94a3b8"
+                  stroke={lineColor}
                   strokeWidth={2}
                   dot={false}
                 />
@@ -86,7 +95,6 @@ const Dashboard = () => {
         const ouraData = await ouraResponse.json();
         const withingsData = await withingsResponse.json();
 
-        // Data comes in reverse chronological order, keep it that way for latest values
         setOuraData(ouraData);
         setWithingsData(withingsData);
       } catch (error) {
@@ -98,21 +106,78 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  // Helper function for sparklines - now using all data points
   const createSparklineData = (data, key) => {
     if (!data || !Array.isArray(data)) return [];
     return [...data].reverse().map(d => ({ value: d[key] }));
   };
 
-  // Calculate trend based on last two values
-  const calculateTrend = (data, key) => {
-    if (!data || data.length < 2) return 'No data';
+  const getTrendInfo = (data, key, metric) => {
+    if (!data || data.length < 2) return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    
     const latest = data[0][key];
     const previous = data[1][key];
     const diff = latest - previous;
+    const stable = Math.abs(diff) < 0.01;
     
-    if (Math.abs(diff) < 0.01) return 'Stable';
-    return diff > 0 ? 'Increasing' : 'Decreasing';
+    // Default colors for stable trend
+    let trendColor = 'text-blue-500';
+    let lineColor = '#3b82f6'; // blue
+
+    switch(metric) {
+      case 'hrv':
+        if (stable) return { trend: 'Stable', color: trendColor, lineColor };
+        if (diff > 0) {
+          trendColor = 'text-green-500';
+          lineColor = '#22c55e'; // green
+        }
+        return { 
+          trend: diff > 0 ? 'Increasing' : 'Decreasing', 
+          color: trendColor, 
+          lineColor 
+        };
+        
+      case 'rhr':
+      case 'weight':
+      case 'bodyFat':
+        if (stable) return { trend: 'Stable', color: trendColor, lineColor };
+        if (diff < 0) {
+          trendColor = 'text-red-500';
+          lineColor = '#ef4444'; // red
+        }
+        return { 
+          trend: diff > 0 ? 'Increasing' : 'Decreasing', 
+          color: trendColor, 
+          lineColor 
+        };
+        
+      case 'sleep':
+        const hours = latest;
+        if (hours >= 7 && hours <= 8) {
+          trendColor = 'text-green-500';
+          lineColor = '#22c55e';
+          return { trend: 'Within target', color: trendColor, lineColor };
+        }
+        trendColor = 'text-red-500';
+        lineColor = '#ef4444';
+        return { 
+          trend: hours < 7 ? 'Below target' : 'Above target', 
+          color: trendColor, 
+          lineColor 
+        };
+        
+      case 'delay':
+        if (latest >= 20) {
+          trendColor = 'text-red-500';
+          lineColor = '#ef4444';
+          return { trend: 'Above target', color: trendColor, lineColor };
+        }
+        trendColor = 'text-green-500';
+        lineColor = '#22c55e';
+        return { trend: 'Within target', color: trendColor, lineColor };
+        
+      default:
+        return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    }
   };
 
   return (
@@ -134,7 +199,7 @@ const Dashboard = () => {
             title="HRV"
             value={ouraData[0]?.average_hrv?.toFixed(0) ?? '--'}
             unit="ms"
-            trend={calculateTrend(ouraData, 'average_hrv')}
+            {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
             sparklineData={createSparklineData(ouraData, 'average_hrv')}
             icon={Activity}
           />
@@ -143,7 +208,7 @@ const Dashboard = () => {
             title="Resting Heart Rate"
             value={ouraData[0]?.resting_heart_rate?.toFixed(0) ?? '--'}
             unit="bpm"
-            trend={calculateTrend(ouraData, 'resting_heart_rate')}
+            {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
             sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
             icon={Heart}
           />
@@ -152,7 +217,7 @@ const Dashboard = () => {
             title="Weight"
             value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
             unit="lbs"
-            trend={calculateTrend(withingsData, 'weight')}
+            {...getTrendInfo(withingsData, 'weight', 'weight')}
             sparklineData={createSparklineData(withingsData, 'weight')}
             icon={Scale}
           />
@@ -161,17 +226,16 @@ const Dashboard = () => {
             title="Body Fat"
             value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
             unit="%"
-            trend={calculateTrend(withingsData, 'fat_ratio')}
+            {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
             sparklineData={createSparklineData(withingsData, 'fat_ratio')}
             icon={Activity}
-            trendColor="text-purple-500"
           />
           
           <MetricCard
             title="Total Sleep"
             value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
             unit="h"
-            trend={calculateTrend(ouraData, 'total_sleep')}
+            {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
             sparklineData={createSparklineData(ouraData, 'total_sleep')}
             icon={Moon}
           />
@@ -180,7 +244,7 @@ const Dashboard = () => {
             title="Sleep Delay"
             value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
             unit="min"
-            trend={calculateTrend(ouraData, 'delay')}
+            {...getTrendInfo(ouraData, 'delay', 'delay')}
             sparklineData={createSparklineData(ouraData, 'delay')}
             icon={Timer}
           />
