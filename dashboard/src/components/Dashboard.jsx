@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Moon, Heart, Scale, Activity, Timer, Home, ClipboardList, Dumbbell } from 'lucide-react';
+import { Moon, Heart, Scale, Activity, Timer, Sun } from 'lucide-react';
 
 // Metric card component
 const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500" }) => {
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6">
-      <div className="flex items-center text-gray-500 mb-4">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
+      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
         <Icon className="w-5 h-5 mr-2" />
         <span className="text-sm">{title}</span>
       </div>
       
       <div className="flex justify-between items-end">
         <div className="space-y-1">
-          <div className="text-4xl font-semibold">
+          <div className="text-4xl font-semibold text-gray-900 dark:text-white">
             {value}
-            <span className="text-gray-400 text-2xl ml-1">{unit}</span>
+            <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">{unit}</span>
           </div>
           <div className={`text-sm ${trendColor}`}>
             {trend}
@@ -42,32 +42,36 @@ const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, tren
   );
 };
 
-// Navigation bar component
-const NavBar = () => (
-  <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-4">
-    <div className="flex flex-col items-center text-gray-400">
-      <Home className="w-6 h-6" />
-      <span className="text-xs mt-1">Home</span>
-    </div>
-    <div className="flex flex-col items-center text-gray-400">
-      <ClipboardList className="w-6 h-6" />
-      <span className="text-xs mt-1">Journal</span>
-    </div>
-    <div className="flex flex-col items-center text-gray-400">
-      <Dumbbell className="w-6 h-6" />
-      <span className="text-xs mt-1">Fitness</span>
-    </div>
-    <div className="flex flex-col items-center text-gray-900">
-      <Heart className="w-6 h-6" />
-      <span className="text-xs mt-1">Biology</span>
-    </div>
-  </div>
+// Theme toggle button
+const ThemeToggle = ({ isDark, onToggle }) => (
+  <button
+    onClick={onToggle}
+    className="p-3 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+  >
+    {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+  </button>
 );
 
 // Main dashboard component
 const Dashboard = () => {
   const [ouraData, setOuraData] = useState([]);
   const [withingsData, setWithingsData] = useState([]);
+  const [isDark, setIsDark] = useState(false);
+
+  // Handle theme toggle
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  // Initialize theme
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDark(prefersDark);
+    if (prefersDark) {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
 
   // Generate some sample sparkline data
   const generateSparklineData = (baseValue, count = 10) => {
@@ -87,8 +91,7 @@ const Dashboard = () => {
     
     const mockWithingsData = [{
       weight: 159.3,
-      fat_ratio: 10.8,
-      lean_mass: 142.2
+      fat_ratio: 10.8
     }];
     
     setOuraData(mockOuraData);
@@ -96,9 +99,12 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Biology</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today</h1>
+          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MetricCard
@@ -140,12 +146,12 @@ const Dashboard = () => {
           />
           
           <MetricCard
-            title="Lean Body Mass"
-            value={withingsData[0]?.lean_mass?.toFixed(1) ?? '--'}
-            unit="lbs"
-            trend="Decreasing"
-            sparklineData={generateSparklineData(142.2)}
-            icon={Activity}
+            title="Total Sleep"
+            value={ouraData[0]?.total_sleep ? (ouraData[0].total_sleep / 60).toFixed(1) : '--'}
+            unit="h"
+            trend="Normal"
+            sparklineData={generateSparklineData(7.4)}
+            icon={Moon}
           />
           
           <MetricCard
@@ -159,8 +165,6 @@ const Dashboard = () => {
           />
         </div>
       </div>
-      
-      <NavBar />
     </div>
   );
 };
