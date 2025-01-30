@@ -16,7 +16,7 @@ const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, tren
             {value}
             <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">{unit}</span>
           </div>
-          <div className={`text-sm ${trendColor}`}>
+          <div style={{ color: lineColor }} className="text-sm">
             {trend}
           </div>
         </div>
@@ -64,12 +64,29 @@ const Dashboard = () => {
     document.documentElement.classList.toggle('dark');
   };
 
+  // Initialize theme and watch for system changes
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDark(prefersDark);
-    if (prefersDark) {
-      document.documentElement.classList.add('dark');
-    }
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const setThemeFromSystem = (e) => {
+      const isDarkMode = e.matches;
+      setIsDark(isDarkMode);
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    // Set initial theme
+    setThemeFromSystem(prefersDark);
+
+    // Listen for changes
+    prefersDark.addEventListener('change', setThemeFromSystem);
+
+    return () => {
+      prefersDark.removeEventListener('change', setThemeFromSystem);
+    };
   }, []);
 
   const getAverage = (data, key, startIdx, count) => {
@@ -304,7 +321,10 @@ const Dashboard = () => {
         
         <div className="grid grid-cols-1 gap-8">
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Heart</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <Heart className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Heart</h2>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <MetricCard
                 title="HRV"
@@ -327,7 +347,10 @@ const Dashboard = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Body</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <Scale className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Body</h2>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <MetricCard
                 title="Weight"
@@ -350,7 +373,10 @@ const Dashboard = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Sleep</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <Moon className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sleep</h2>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <MetricCard
                 title="Total Sleep"
