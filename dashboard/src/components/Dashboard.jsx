@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles } from 'lucide-react';
+import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles, 
+         PlugZap, BedDouble, Waves, Ruler, HeartPulse } from 'lucide-react';
 
 const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500", lineColor = "#94a3b8" }) => {
   return (
@@ -341,7 +342,7 @@ const Dashboard = () => {
                 unit="bpm"
                 {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
                 sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
-                icon={Heart}
+                icon={HeartPulse}
               />
             </div>
           </section>
@@ -367,7 +368,7 @@ const Dashboard = () => {
                 unit="%"
                 {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
                 sparklineData={createSparklineData(withingsData, 'fat_ratio')}
-                icon={Activity}
+                icon={Ruler}
               />
             </div>
           </section>
@@ -384,7 +385,7 @@ const Dashboard = () => {
                 unit="h"
                 {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
                 sparklineData={createSparklineData(ouraData, 'total_sleep')}
-                icon={Moon}
+                icon={BedDouble}
               />
               
               <MetricCard
@@ -393,7 +394,7 @@ const Dashboard = () => {
                 unit="min"
                 {...getTrendInfo(ouraData, 'deep_sleep_minutes', 'deep_sleep')}
                 sparklineData={createSparklineData(ouraData, 'deep_sleep_minutes')}
-                icon={Moon}
+                icon={Waves}
               />
 
               <MetricCard
@@ -402,7 +403,7 @@ const Dashboard = () => {
                 unit="%"
                 {...getTrendInfo(ouraData, 'efficiency', 'efficiency')}
                 sparklineData={createSparklineData(ouraData, 'efficiency')}
-                icon={Activity}
+                icon={PlugZap}
               />
               
               <MetricCard
