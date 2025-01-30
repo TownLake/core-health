@@ -177,10 +177,16 @@ const Dashboard = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        console.log('Fetching data...');
         const [ouraResponse, withingsResponse] = await Promise.all([
           fetch('/api/oura'),
           fetch('/api/withings')
         ]);
+
+        console.log('API responses:', {
+          oura: ouraResponse.ok,
+          withings: withingsResponse.ok
+        });
 
         if (!ouraResponse.ok || !withingsResponse.ok) {
           throw new Error('One or more API calls failed');
@@ -189,15 +195,15 @@ const Dashboard = () => {
         const ouraData = await ouraResponse.json();
         const withingsData = await withingsResponse.json();
 
-        console.log('Data loaded:', { ouraData, withingsData });
+        console.log('Data received:', {
+          ouraLength: ouraData?.length,
+          withingsLength: withingsData?.length,
+          ouraFirst: ouraData?.[0],
+          withingsFirst: withingsData?.[0]
+        });
 
-        // Only set data if we received valid arrays with content
-        if (Array.isArray(ouraData) && ouraData.length > 0) {
-          setOuraData(ouraData);
-        }
-        if (Array.isArray(withingsData) && withingsData.length > 0) {
-          setWithingsData(withingsData);
-        }
+        setOuraData(ouraData || []);
+        setWithingsData(withingsData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error.message);
@@ -216,7 +222,17 @@ const Dashboard = () => {
   };
 
   // Check if we have enough data to render
-  const hasValidData = ouraData.length > 0 && withingsData.length > 0;
+  const hasValidData = Array.isArray(ouraData) && 
+                      Array.isArray(withingsData) && 
+                      ouraData.length > 0 && 
+                      withingsData.length > 0;
+
+  console.log('Render state:', {
+    isLoading,
+    hasValidData,
+    ouraLength: ouraData?.length,
+    withingsLength: withingsData?.length
+  });
 
   if (isLoading) {
     return (
@@ -229,7 +245,9 @@ const Dashboard = () => {
   if (!hasValidData) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-gray-600 dark:text-gray-300">No data available</div>
+        <div className="text-gray-600 dark:text-gray-300">
+          {error || 'No data available'}
+        </div>
       </div>
     );
   }
