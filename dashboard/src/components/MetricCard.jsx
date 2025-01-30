@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { X } from 'lucide-react';
 
-// Custom Tooltip component for the detailed chart
 const CustomTooltip = ({ active, payload, label, unit }) => {
   if (active && payload && payload.length) {
     return (
@@ -23,7 +22,6 @@ const CustomTooltip = ({ active, payload, label, unit }) => {
   return null;
 };
 
-// Custom Tooltip for sparkline
 const SparklineTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
@@ -65,7 +63,7 @@ const DetailedChartModal = ({ isOpen, onClose, title, data, dataKey, unit, icon:
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
               <defs>
-                <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`detailGradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
                   <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                 </linearGradient>
@@ -104,7 +102,7 @@ const DetailedChartModal = ({ isOpen, onClose, title, data, dataKey, unit, icon:
                 stroke="#3B82F6"
                 strokeWidth={2}
                 fillOpacity={1}
-                fill="url(#colorValue)"
+                fill={`url(#detailGradient-${dataKey})`}
                 dot={false}
                 activeDot={{ 
                   r: 6, 
@@ -115,10 +113,6 @@ const DetailedChartModal = ({ isOpen, onClose, title, data, dataKey, unit, icon:
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
-
-        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-          Hover over the chart to see detailed values
         </div>
       </div>
     </div>
@@ -138,6 +132,7 @@ const MetricCard = ({
   dataKey 
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const gradientId = `sparkline-${dataKey}-gradient`;
 
   return (
     <>
@@ -166,7 +161,7 @@ const MetricCard = ({
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={sparklineData}>
                   <defs>
-                    <linearGradient id={`sparkline${title}`} x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={lineColor} stopOpacity={0.3}/>
                       <stop offset="95%" stopColor={lineColor} stopOpacity={0}/>
                     </linearGradient>
@@ -181,8 +176,9 @@ const MetricCard = ({
                     stroke={lineColor}
                     strokeWidth={2}
                     fillOpacity={1}
-                    fill={`url(#sparkline${title})`}
+                    fill={`url(#${gradientId})`}
                     dot={false}
+                    isAnimationActive={true}
                   />
                 </AreaChart>
               </ResponsiveContainer>
