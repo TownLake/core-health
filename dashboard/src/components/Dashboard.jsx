@@ -1,46 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles, 
-         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardList } from 'lucide-react';
-
-const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500", lineColor = "#94a3b8" }) => {
-  return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
-      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
-        <Icon className="w-5 h-5 mr-2" />
-        <span className="text-sm">{title}</span>
-      </div>
-      
-      <div className="flex justify-between items-end">
-        <div className="space-y-1">
-          <div className="text-4xl font-semibold text-gray-900 dark:text-white">
-            {value}
-            <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">{unit}</span>
-          </div>
-          <div style={{ color: lineColor }} className="text-sm">
-            {trend}
-          </div>
-        </div>
-        
-        {sparklineData && sparklineData.length > 0 && (
-          <div className="w-32 h-16">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sparklineData}>
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={lineColor}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck } from 'lucide-react';
+import MetricCard from './MetricCard';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 
 const ThemeToggle = ({ isDark, onToggle }) => (
   <button
@@ -79,10 +41,7 @@ const Dashboard = () => {
       }
     };
 
-    // Set initial theme
     setThemeFromSystem(prefersDark);
-
-    // Listen for changes
     prefersDark.addEventListener('change', setThemeFromSystem);
 
     return () => {
@@ -134,30 +93,30 @@ const Dashboard = () => {
         }
         return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
         
-              case 'sleep':
-        case 'efficiency':
-          const effValue = recentAvg;
-          if (metric === 'efficiency' && effValue >= 96) {
-            return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
-          } else if (metric === 'efficiency') {
-            return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
-          }
-          const sleepHours = recentAvg;
-          if (sleepHours >= 7 && sleepHours <= 8.5) {
-            return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
-          }
-          return { 
-            trend: sleepHours < 7 ? 'Below target' : 'Above target', 
-            color: colors.bad.text, 
-            lineColor: colors.bad.line 
-          };
-        
-        case 'deep_sleep':
-          const deepSleepMins = recentAvg;
-          if (deepSleepMins >= 60) {
-            return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
-          }
+      case 'sleep':
+      case 'efficiency':
+        const effValue = recentAvg;
+        if (metric === 'efficiency' && effValue >= 96) {
+          return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
+        } else if (metric === 'efficiency') {
           return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
+        }
+        const sleepHours = recentAvg;
+        if (sleepHours >= 7 && sleepHours <= 8.5) {
+          return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { 
+          trend: sleepHours < 7 ? 'Below target' : 'Above target', 
+          color: colors.bad.text, 
+          lineColor: colors.bad.line 
+        };
+        
+      case 'deep_sleep':
+        const deepSleepMins = recentAvg;
+        if (deepSleepMins >= 60) {
+          return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
         
       case 'delay':
         const delayMins = recentAvg;
@@ -186,8 +145,7 @@ const Dashboard = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Analysis failed');
+        throw new Error('AI analysis failed');
       }
       
       const data = await response.json();
@@ -196,7 +154,6 @@ const Dashboard = () => {
       }
       
       setAiResponse(data.response);
-      console.log('AI Response:', data.response);
     } catch (error) {
       console.error('AI analysis error:', error);
       setError('Failed to get AI insights');
@@ -209,16 +166,10 @@ const Dashboard = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        console.log('Fetching data...');
         const [ouraResponse, withingsResponse] = await Promise.all([
           fetch('/api/oura'),
           fetch('/api/withings')
         ]);
-
-        console.log('API responses:', {
-          oura: ouraResponse.ok,
-          withings: withingsResponse.ok
-        });
 
         if (!ouraResponse.ok || !withingsResponse.ok) {
           throw new Error('One or more API calls failed');
@@ -226,13 +177,6 @@ const Dashboard = () => {
 
         const ouraData = await ouraResponse.json();
         const withingsData = await withingsResponse.json();
-
-        console.log('Data received:', {
-          ouraLength: ouraData?.length,
-          withingsLength: withingsData?.length,
-          ouraFirst: ouraData?.[0],
-          withingsFirst: withingsData?.[0]
-        });
 
         setOuraData(ouraData || []);
         setWithingsData(withingsData || []);
@@ -256,13 +200,6 @@ const Dashboard = () => {
                       Array.isArray(withingsData) && 
                       ouraData.length > 0 && 
                       withingsData.length > 0;
-
-  console.log('Render state:', {
-    isLoading,
-    hasValidData,
-    ouraLength: ouraData?.length,
-    withingsLength: withingsData?.length
-  });
 
   if (isLoading) {
     return (
@@ -334,6 +271,8 @@ const Dashboard = () => {
                 {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
                 sparklineData={createSparklineData(ouraData, 'average_hrv')}
                 icon={Activity}
+                fullData={ouraData}
+                dataKey="average_hrv"
               />
               
               <MetricCard
@@ -343,13 +282,15 @@ const Dashboard = () => {
                 {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
                 sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
                 icon={HeartPulse}
+                fullData={ouraData}
+                dataKey="resting_heart_rate"
               />
             </div>
           </section>
 
           <section>
             <div className="flex items-center gap-2 mb-4">
-              <ClipboardList className="w-6 h-6 text-gray-900 dark:text-white" />
+              <ClipboardCheck className="w-6 h-6 text-gray-900 dark:text-white" />
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Body</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -360,6 +301,8 @@ const Dashboard = () => {
                 {...getTrendInfo(withingsData, 'weight', 'weight')}
                 sparklineData={createSparklineData(withingsData, 'weight')}
                 icon={Scale}
+                fullData={withingsData}
+                dataKey="weight"
               />
               
               <MetricCard
@@ -369,6 +312,8 @@ const Dashboard = () => {
                 {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
                 sparklineData={createSparklineData(withingsData, 'fat_ratio')}
                 icon={Ruler}
+                fullData={withingsData}
+                dataKey="fat_ratio"
               />
             </div>
           </section>
@@ -384,42 +329,4 @@ const Dashboard = () => {
                 value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
                 unit="h"
                 {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
-                sparklineData={createSparklineData(ouraData, 'total_sleep')}
-                icon={BedDouble}
-              />
-              
-              <MetricCard
-                title="Deep Sleep"
-                value={ouraData[0]?.deep_sleep_minutes?.toFixed(0) ?? '--'}
-                unit="min"
-                {...getTrendInfo(ouraData, 'deep_sleep_minutes', 'deep_sleep')}
-                sparklineData={createSparklineData(ouraData, 'deep_sleep_minutes')}
-                icon={Waves}
-              />
-
-              <MetricCard
-                title="Sleep Efficiency"
-                value={ouraData[0]?.efficiency?.toFixed(0) ?? '--'}
-                unit="%"
-                {...getTrendInfo(ouraData, 'efficiency', 'efficiency')}
-                sparklineData={createSparklineData(ouraData, 'efficiency')}
-                icon={PlugZap}
-              />
-              
-              <MetricCard
-                title="Sleep Delay"
-                value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
-                unit="min"
-                {...getTrendInfo(ouraData, 'delay', 'delay')}
-                sparklineData={createSparklineData(ouraData, 'delay')}
-                icon={Timer}
-              />
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Dashboard;
+                sparklineData={createSparklineData(o
