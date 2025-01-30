@@ -1,18 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles } from 'lucide-react';
+import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles, 
+         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardList } from 'lucide-react';
 
-// Metric card component
-const MetricCard = ({ 
-  title, 
-  value, 
-  unit, 
-  trend, 
-  sparklineData, 
-  icon: Icon, 
-  trendColor = "text-blue-500",
-  lineColor = "#94a3b8" 
-}) => {
+const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500", lineColor = "#94a3b8" }) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
       <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
@@ -26,7 +17,7 @@ const MetricCard = ({
             {value}
             <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">{unit}</span>
           </div>
-          <div className={`text-sm ${trendColor}`}>
+          <div style={{ color: lineColor }} className="text-sm">
             {trend}
           </div>
         </div>
@@ -67,6 +58,118 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [aiResponse, setAiResponse] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  // Initialize theme and watch for system changes
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const setThemeFromSystem = (e) => {
+      const isDarkMode = e.matches;
+      setIsDark(isDarkMode);
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    // Set initial theme
+    setThemeFromSystem(prefersDark);
+
+    // Listen for changes
+    prefersDark.addEventListener('change', setThemeFromSystem);
+
+    return () => {
+      prefersDark.removeEventListener('change', setThemeFromSystem);
+    };
+  }, []);
+
+  const getAverage = (data, key, startIdx, count) => {
+    const values = data.slice(startIdx, startIdx + count)
+                      .map(d => d[key])
+                      .filter(v => v !== null && v !== undefined);
+    return values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : null;
+  };
+
+  const getTrendInfo = (data, key, metric) => {
+    if (!data || data.length < 10) return { trend: 'Lacks data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    
+    const recentAvg = getAverage(data, key, 0, 3);  // Last 3 days
+    const previousAvg = getAverage(data, key, 3, 7); // Prior 7 days
+    
+    if (recentAvg === null || previousAvg === null) {
+      return { trend: 'Lacks data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    }
+
+    const diff = recentAvg - previousAvg;
+    const percentChange = Math.abs(diff / previousAvg);
+    const stable = percentChange < 0.02; // 2% threshold
+    
+    const colors = {
+      stable: { text: 'text-blue-500', line: '#3b82f6' },
+      good: { text: 'text-green-500', line: '#22c55e' },
+      bad: { text: 'text-red-500', line: '#ef4444' }
+    };
+
+    switch(metric) {
+      case 'hrv':
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
+        if (diff > 0) {
+          return { trend: 'Increasing', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Decreasing', color: colors.bad.text, lineColor: colors.bad.line };
+        
+      case 'rhr':
+      case 'weight':
+      case 'bodyFat':
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
+        if (diff < 0) {
+          return { trend: 'Decreasing', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
+        
+              case 'sleep':
+        case 'efficiency':
+          const effValue = recentAvg;
+          if (metric === 'efficiency' && effValue >= 96) {
+            return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
+          } else if (metric === 'efficiency') {
+            return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
+          }
+          const sleepHours = recentAvg;
+          if (sleepHours >= 7 && sleepHours <= 8.5) {
+            return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
+          }
+          return { 
+            trend: sleepHours < 7 ? 'Below target' : 'Above target', 
+            color: colors.bad.text, 
+            lineColor: colors.bad.line 
+          };
+        
+        case 'deep_sleep':
+          const deepSleepMins = recentAvg;
+          if (deepSleepMins >= 60) {
+            return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
+          }
+          return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
+        
+      case 'delay':
+        const delayMins = recentAvg;
+        if (delayMins >= 20) {
+          return { trend: 'Above target', color: colors.bad.text, lineColor: colors.bad.line };
+        }
+        return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
+        
+      default:
+        return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    }
+  };
 
   const getAIInsights = async () => {
     setIsAnalyzing(true);
@@ -102,26 +205,20 @@ const Dashboard = () => {
     }
   };
 
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
-  };
-
-  useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDark(prefersDark);
-    if (prefersDark) {
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
+        console.log('Fetching data...');
         const [ouraResponse, withingsResponse] = await Promise.all([
           fetch('/api/oura'),
           fetch('/api/withings')
         ]);
+
+        console.log('API responses:', {
+          oura: ouraResponse.ok,
+          withings: withingsResponse.ok
+        });
 
         if (!ouraResponse.ok || !withingsResponse.ok) {
           throw new Error('One or more API calls failed');
@@ -130,11 +227,20 @@ const Dashboard = () => {
         const ouraData = await ouraResponse.json();
         const withingsData = await withingsResponse.json();
 
-        setOuraData(ouraData);
-        setWithingsData(withingsData);
+        console.log('Data received:', {
+          ouraLength: ouraData?.length,
+          withingsLength: withingsData?.length,
+          ouraFirst: ouraData?.[0],
+          withingsFirst: withingsData?.[0]
+        });
+
+        setOuraData(ouraData || []);
+        setWithingsData(withingsData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error.message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -142,76 +248,39 @@ const Dashboard = () => {
   }, []);
 
   const createSparklineData = (data, key) => {
-    if (!data || !Array.isArray(data)) return [];
+    if (!data || !Array.isArray(data) || data.length === 0) return [];
     return [...data].reverse().map(d => ({ value: d[key] }));
   };
 
-  const getAverage = (data, key, startIdx, count) => {
-    const values = data.slice(startIdx, startIdx + count)
-                      .map(d => d[key])
-                      .filter(v => v !== null && v !== undefined);
-    return values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : null;
-  };
+  const hasValidData = Array.isArray(ouraData) && 
+                      Array.isArray(withingsData) && 
+                      ouraData.length > 0 && 
+                      withingsData.length > 0;
 
-  const getTrendInfo = (data, key, metric) => {
-    if (!data || data.length < 10) return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
-    
-    const recentAvg = getAverage(data, key, 0, 3);  // Last 3 days
-    const previousAvg = getAverage(data, key, 3, 7); // Prior 7 days
-    
-    if (recentAvg === null || previousAvg === null) {
-      return { trend: 'Insufficient data', color: 'text-gray-500', lineColor: '#94a3b8' };
-    }
+  console.log('Render state:', {
+    isLoading,
+    hasValidData,
+    ouraLength: ouraData?.length,
+    withingsLength: withingsData?.length
+  });
 
-    const diff = recentAvg - previousAvg;
-    const percentChange = Math.abs(diff / previousAvg);
-    const stable = percentChange < 0.02; // 2% threshold
-    
-    // Default colors for stable trend
-    const colors = {
-      stable: { text: 'text-blue-500', line: '#3b82f6' },
-      good: { text: 'text-green-500', line: '#22c55e' },
-      bad: { text: 'text-red-500', line: '#ef4444' }
-    };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-gray-600 dark:text-gray-300">Loading data...</div>
+      </div>
+    );
+  }
 
-    switch(metric) {
-      case 'hrv':
-        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
-        if (diff > 0) {
-          return { trend: 'Increasing', color: colors.good.text, lineColor: colors.good.line };
-        }
-        return { trend: 'Decreasing', color: colors.bad.text, lineColor: colors.bad.line };
-        
-      case 'rhr':
-      case 'weight':
-      case 'bodyFat':
-        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
-        if (diff < 0) {
-          return { trend: 'Decreasing', color: colors.good.text, lineColor: colors.good.line };
-        }
-        return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
-        
-      case 'sleep':
-        const hours = latest;
-        if (hours >= 7 && hours <= 8.5) {
-          return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
-        }
-        return { 
-          trend: hours < 7 ? 'Below target' : 'Above target', 
-          color: colors.bad.text, 
-          lineColor: colors.bad.line 
-        };
-        
-      case 'delay':
-        if (latest >= 20) {
-          return { trend: 'Above target', color: colors.bad.text, lineColor: colors.bad.line };
-        }
-        return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
-        
-      default:
-        return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
-    }
-  };
+  if (!hasValidData) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-gray-600 dark:text-gray-300">
+          {error || 'No data available'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
@@ -229,6 +298,13 @@ const Dashboard = () => {
             <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           </div>
         </div>
+        
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+            Error loading data: {error}
+          </div>
+        )}
+
         {isAnalyzing && (
           <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
             <div className="flex items-center justify-center text-gray-700 dark:text-gray-300">
@@ -236,6 +312,7 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+
         {aiResponse && !isAnalyzing && (
           <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
             <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Health Insights</h2>
@@ -243,66 +320,102 @@ const Dashboard = () => {
           </div>
         )}
         
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-            Error loading data: {error}
-          </div>
-        )}
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <MetricCard
-            title="HRV"
-            value={ouraData[0]?.average_hrv?.toFixed(0) ?? '--'}
-            unit="ms"
-            {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
-            sparklineData={createSparklineData(ouraData, 'average_hrv')}
-            icon={Activity}
-          />
-          
-          <MetricCard
-            title="Resting Heart Rate"
-            value={ouraData[0]?.resting_heart_rate?.toFixed(0) ?? '--'}
-            unit="bpm"
-            {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
-            sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
-            icon={Heart}
-          />
-          
-          <MetricCard
-            title="Weight"
-            value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
-            unit="lbs"
-            {...getTrendInfo(withingsData, 'weight', 'weight')}
-            sparklineData={createSparklineData(withingsData, 'weight')}
-            icon={Scale}
-          />
-          
-          <MetricCard
-            title="Body Fat"
-            value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
-            unit="%"
-            {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
-            sparklineData={createSparklineData(withingsData, 'fat_ratio')}
-            icon={Activity}
-          />
-          
-          <MetricCard
-            title="Total Sleep"
-            value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
-            unit="h"
-            {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
-            sparklineData={createSparklineData(ouraData, 'total_sleep')}
-            icon={Moon}
-          />
-          
-          <MetricCard
-            title="Sleep Delay"
-            value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
-            unit="min"
-            {...getTrendInfo(ouraData, 'delay', 'delay')}
-            sparklineData={createSparklineData(ouraData, 'delay')}
-            icon={Timer}
-          />
+        <div className="grid grid-cols-1 gap-8">
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Heart className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Heart</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="HRV"
+                value={ouraData[0]?.average_hrv?.toFixed(0) ?? '--'}
+                unit="ms"
+                {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
+                sparklineData={createSparklineData(ouraData, 'average_hrv')}
+                icon={Activity}
+              />
+              
+              <MetricCard
+                title="Resting Heart Rate"
+                value={ouraData[0]?.resting_heart_rate?.toFixed(0) ?? '--'}
+                unit="bpm"
+                {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
+                sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
+                icon={HeartPulse}
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <ClipboardList className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Body</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="Weight"
+                value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
+                unit="lbs"
+                {...getTrendInfo(withingsData, 'weight', 'weight')}
+                sparklineData={createSparklineData(withingsData, 'weight')}
+                icon={Scale}
+              />
+              
+              <MetricCard
+                title="Body Fat"
+                value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
+                unit="%"
+                {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
+                sparklineData={createSparklineData(withingsData, 'fat_ratio')}
+                icon={Ruler}
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Moon className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sleep</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="Total Sleep"
+                value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
+                unit="h"
+                {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
+                sparklineData={createSparklineData(ouraData, 'total_sleep')}
+                icon={BedDouble}
+              />
+              
+              <MetricCard
+                title="Deep Sleep"
+                value={ouraData[0]?.deep_sleep_minutes?.toFixed(0) ?? '--'}
+                unit="min"
+                {...getTrendInfo(ouraData, 'deep_sleep_minutes', 'deep_sleep')}
+                sparklineData={createSparklineData(ouraData, 'deep_sleep_minutes')}
+                icon={Waves}
+              />
+
+              <MetricCard
+                title="Sleep Efficiency"
+                value={ouraData[0]?.efficiency?.toFixed(0) ?? '--'}
+                unit="%"
+                {...getTrendInfo(ouraData, 'efficiency', 'efficiency')}
+                sparklineData={createSparklineData(ouraData, 'efficiency')}
+                icon={PlugZap}
+              />
+              
+              <MetricCard
+                title="Sleep Delay"
+                value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
+                unit="min"
+                {...getTrendInfo(ouraData, 'delay', 'delay')}
+                sparklineData={createSparklineData(ouraData, 'delay')}
+                icon={Timer}
+              />
+            </div>
+          </section>
         </div>
       </div>
     </div>
