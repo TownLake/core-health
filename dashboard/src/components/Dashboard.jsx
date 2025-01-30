@@ -80,13 +80,13 @@ const Dashboard = () => {
   };
 
   const getTrendInfo = (data, key, metric) => {
-    if (!data || data.length < 10) return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
+    if (!data || data.length < 10) return { trend: 'Lacks data', color: 'text-gray-500', lineColor: '#94a3b8' };
     
     const recentAvg = getAverage(data, key, 0, 3);  // Last 3 days
     const previousAvg = getAverage(data, key, 3, 7); // Prior 7 days
     
     if (recentAvg === null || previousAvg === null) {
-      return { trend: 'Insufficient data', color: 'text-gray-500', lineColor: '#94a3b8' };
+      return { trend: 'Lacks data', color: 'text-gray-500', lineColor: '#94a3b8' };
     }
 
     const diff = recentAvg - previousAvg;
@@ -116,16 +116,30 @@ const Dashboard = () => {
         }
         return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
         
-      case 'sleep':
-        const sleepHours = recentAvg;
-        if (sleepHours >= 7 && sleepHours <= 8.5) {
-          return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
-        }
-        return { 
-          trend: sleepHours < 7 ? 'Below target' : 'Above target', 
-          color: colors.bad.text, 
-          lineColor: colors.bad.line 
-        };
+              case 'sleep':
+        case 'efficiency':
+          const effValue = recentAvg;
+          if (metric === 'efficiency' && effValue >= 96) {
+            return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
+          } else if (metric === 'efficiency') {
+            return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
+          }
+          const sleepHours = recentAvg;
+          if (sleepHours >= 7 && sleepHours <= 8.5) {
+            return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
+          }
+          return { 
+            trend: sleepHours < 7 ? 'Below target' : 'Above target', 
+            color: colors.bad.text, 
+            lineColor: colors.bad.line 
+          };
+        
+        case 'deep_sleep':
+          const deepSleepMins = recentAvg;
+          if (deepSleepMins >= 60) {
+            return { trend: 'Above target', color: colors.good.text, lineColor: colors.good.line };
+          }
+          return { trend: 'Below target', color: colors.bad.text, lineColor: colors.bad.line };
         
       case 'delay':
         const delayMins = recentAvg;
@@ -288,60 +302,93 @@ const Dashboard = () => {
           </div>
         )}
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <MetricCard
-            title="HRV"
-            value={ouraData[0]?.average_hrv?.toFixed(0) ?? '--'}
-            unit="ms"
-            {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
-            sparklineData={createSparklineData(ouraData, 'average_hrv')}
-            icon={Activity}
-          />
-          
-          <MetricCard
-            title="Resting Heart Rate"
-            value={ouraData[0]?.resting_heart_rate?.toFixed(0) ?? '--'}
-            unit="bpm"
-            {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
-            sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
-            icon={Heart}
-          />
-          
-          <MetricCard
-            title="Weight"
-            value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
-            unit="lbs"
-            {...getTrendInfo(withingsData, 'weight', 'weight')}
-            sparklineData={createSparklineData(withingsData, 'weight')}
-            icon={Scale}
-          />
-          
-          <MetricCard
-            title="Body Fat"
-            value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
-            unit="%"
-            {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
-            sparklineData={createSparklineData(withingsData, 'fat_ratio')}
-            icon={Activity}
-          />
-          
-          <MetricCard
-            title="Total Sleep"
-            value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
-            unit="h"
-            {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
-            sparklineData={createSparklineData(ouraData, 'total_sleep')}
-            icon={Moon}
-          />
-          
-          <MetricCard
-            title="Sleep Delay"
-            value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
-            unit="min"
-            {...getTrendInfo(ouraData, 'delay', 'delay')}
-            sparklineData={createSparklineData(ouraData, 'delay')}
-            icon={Timer}
-          />
+        <div className="grid grid-cols-1 gap-8">
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Heart</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="HRV"
+                value={ouraData[0]?.average_hrv?.toFixed(0) ?? '--'}
+                unit="ms"
+                {...getTrendInfo(ouraData, 'average_hrv', 'hrv')}
+                sparklineData={createSparklineData(ouraData, 'average_hrv')}
+                icon={Activity}
+              />
+              
+              <MetricCard
+                title="Resting Heart Rate"
+                value={ouraData[0]?.resting_heart_rate?.toFixed(0) ?? '--'}
+                unit="bpm"
+                {...getTrendInfo(ouraData, 'resting_heart_rate', 'rhr')}
+                sparklineData={createSparklineData(ouraData, 'resting_heart_rate')}
+                icon={Heart}
+              />
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Body</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="Weight"
+                value={withingsData[0]?.weight?.toFixed(1) ?? '--'}
+                unit="lbs"
+                {...getTrendInfo(withingsData, 'weight', 'weight')}
+                sparklineData={createSparklineData(withingsData, 'weight')}
+                icon={Scale}
+              />
+              
+              <MetricCard
+                title="Body Fat"
+                value={withingsData[0]?.fat_ratio?.toFixed(1) ?? '--'}
+                unit="%"
+                {...getTrendInfo(withingsData, 'fat_ratio', 'bodyFat')}
+                sparklineData={createSparklineData(withingsData, 'fat_ratio')}
+                icon={Activity}
+              />
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Sleep</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="Total Sleep"
+                value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
+                unit="h"
+                {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
+                sparklineData={createSparklineData(ouraData, 'total_sleep')}
+                icon={Moon}
+              />
+              
+              <MetricCard
+                title="Deep Sleep"
+                value={ouraData[0]?.deep_sleep_minutes?.toFixed(0) ?? '--'}
+                unit="min"
+                {...getTrendInfo(ouraData, 'deep_sleep_minutes', 'deep_sleep')}
+                sparklineData={createSparklineData(ouraData, 'deep_sleep_minutes')}
+                icon={Moon}
+              />
+
+              <MetricCard
+                title="Sleep Efficiency"
+                value={ouraData[0]?.efficiency?.toFixed(0) ?? '--'}
+                unit="%"
+                {...getTrendInfo(ouraData, 'efficiency', 'efficiency')}
+                sparklineData={createSparklineData(ouraData, 'efficiency')}
+                icon={Activity}
+              />
+              
+              <MetricCard
+                title="Sleep Delay"
+                value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
+                unit="min"
+                {...getTrendInfo(ouraData, 'delay', 'delay')}
+                sparklineData={createSparklineData(ouraData, 'delay')}
+                icon={Timer}
+              />
+            </div>
+          </section>
         </div>
       </div>
     </div>
