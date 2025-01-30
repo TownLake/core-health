@@ -329,4 +329,50 @@ const Dashboard = () => {
                 value={ouraData[0]?.total_sleep?.toFixed(1) ?? '--'}
                 unit="h"
                 {...getTrendInfo(ouraData, 'total_sleep', 'sleep')}
-                sparklineData={createSparklineData(o
+                sparklineData={createSparklineData(ouraData, 'total_sleep')}
+                icon={BedDouble}
+                fullData={ouraData}
+                dataKey="total_sleep"
+              />
+              
+              <MetricCard
+                title="Deep Sleep"
+                value={ouraData[0]?.deep_sleep_minutes?.toFixed(0) ?? '--'}
+                unit="min"
+                {...getTrendInfo(ouraData, 'deep_sleep_minutes', 'deep_sleep')}
+                sparklineData={createSparklineData(ouraData, 'deep_sleep_minutes')}
+                icon={Waves}
+                fullData={ouraData}
+                dataKey="deep_sleep_minutes"
+              />
+
+              <MetricCard
+                title="Sleep Efficiency"
+                value={ouraData[0]?.efficiency?.toFixed(0) ?? '--'}
+                unit="%"
+                {...getTrendInfo(ouraData, 'efficiency', 'efficiency')}
+                sparklineData={createSparklineData(ouraData, 'efficiency')}
+                icon={PlugZap}
+                fullData={ouraData}
+                dataKey="efficiency"
+              />
+              
+              <MetricCard
+                title="Sleep Delay"
+                value={ouraData[0]?.delay?.toFixed(0) ?? '--'}
+                unit="min"
+                {...getTrendInfo(ouraData, 'delay', 'delay')}
+                sparklineData={createSparklineData(ouraData, 'delay')}
+                icon={Timer}
+                fullData={ouraData}
+                dataKey="delay"
+              />
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
