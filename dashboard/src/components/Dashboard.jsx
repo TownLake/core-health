@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles, 
-         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardPlus } from 'lucide-react';
+         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardList } from 'lucide-react';
 
 const MetricCard = ({ title, value, unit, trend, sparklineData, icon: Icon, trendColor = "text-blue-500", lineColor = "#94a3b8" }) => {
   return (
@@ -349,7 +349,7 @@ const Dashboard = () => {
 
           <section>
             <div className="flex items-center gap-2 mb-4">
-              <ClipboardPlus className="w-6 h-6 text-gray-900 dark:text-white" />
+              <ClipboardList className="w-6 h-6 text-gray-900 dark:text-white" />
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Body</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
