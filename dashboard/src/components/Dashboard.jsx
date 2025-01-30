@@ -93,7 +93,6 @@ const Dashboard = () => {
     const percentChange = Math.abs(diff / previousAvg);
     const stable = percentChange < 0.02; // 2% threshold
     
-    // Default colors for stable trend
     const colors = {
       stable: { text: 'text-blue-500', line: '#3b82f6' },
       good: { text: 'text-green-500', line: '#22c55e' },
@@ -118,18 +117,19 @@ const Dashboard = () => {
         return { trend: 'Increasing', color: colors.bad.text, lineColor: colors.bad.line };
         
       case 'sleep':
-        const hours = latest;
-        if (hours >= 7 && hours <= 8.5) {
+        const sleepHours = recentAvg;
+        if (sleepHours >= 7 && sleepHours <= 8.5) {
           return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
         }
         return { 
-          trend: hours < 7 ? 'Below target' : 'Above target', 
+          trend: sleepHours < 7 ? 'Below target' : 'Above target', 
           color: colors.bad.text, 
           lineColor: colors.bad.line 
         };
         
       case 'delay':
-        if (latest >= 20) {
+        const delayMins = recentAvg;
+        if (delayMins >= 20) {
           return { trend: 'Above target', color: colors.bad.text, lineColor: colors.bad.line };
         }
         return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
@@ -215,13 +215,11 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  // Helper function for sparklines
   const createSparklineData = (data, key) => {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
     return [...data].reverse().map(d => ({ value: d[key] }));
   };
 
-  // Check if we have enough data to render
   const hasValidData = Array.isArray(ouraData) && 
                       Array.isArray(withingsData) && 
                       ouraData.length > 0 && 
