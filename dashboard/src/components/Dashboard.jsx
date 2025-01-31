@@ -393,6 +393,8 @@ const Dashboard = () => {
             </div>
           </section>
         </div>
+
+        <SocialLinks />
       </div>
     </div>
   );
