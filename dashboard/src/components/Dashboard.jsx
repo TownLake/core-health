@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles, 
-         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck } from 'lucide-react';
+         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck,
+         Github, Twitter } from 'lucide-react';
 import MetricCard from './MetricCard';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 
@@ -11,6 +12,29 @@ const ThemeToggle = ({ isDark, onToggle }) => (
   >
     {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
   </button>
+);
+
+const SocialLinks = () => (
+  <div className="flex justify-center gap-4 py-6 mt-8 border-t border-gray-200 dark:border-gray-700">
+    <a
+      href="https://github.com/TownLake/core-health"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300"
+      aria-label="GitHub Repository"
+    >
+      <Github className="w-6 h-6" />
+    </a>
+    <a
+      href="https://x.com/LakeAustinBlvd"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300"
+      aria-label="X (Twitter) Profile"
+    >
+      <Twitter className="w-6 h-6" />
+    </a>
+  </div>
 );
 
 const Dashboard = () => {
@@ -27,7 +51,6 @@ const Dashboard = () => {
     document.documentElement.classList.toggle('dark');
   };
 
-  // Initialize theme and watch for system changes
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
     
@@ -59,8 +82,8 @@ const Dashboard = () => {
   const getTrendInfo = (data, key, metric) => {
     if (!data || data.length < 10) return { trend: 'Lacks data', color: 'text-gray-500', lineColor: '#94a3b8' };
     
-    const recentAvg = getAverage(data, key, 0, 3);  // Last 3 days
-    const previousAvg = getAverage(data, key, 3, 7); // Prior 7 days
+    const recentAvg = getAverage(data, key, 0, 3);
+    const previousAvg = getAverage(data, key, 3, 7);
     
     if (recentAvg === null || previousAvg === null) {
       return { trend: 'Lacks data', color: 'text-gray-500', lineColor: '#94a3b8' };
@@ -68,7 +91,7 @@ const Dashboard = () => {
 
     const diff = recentAvg - previousAvg;
     const percentChange = Math.abs(diff / previousAvg);
-    const stable = percentChange < 0.02; // 2% threshold
+    const stable = percentChange < 0.02;
     
     const colors = {
       stable: { text: 'text-blue-500', line: '#3b82f6' },
@@ -228,7 +251,7 @@ const Dashboard = () => {
             <button
               onClick={getAIInsights}
               disabled={isAnalyzing}
-              className="p-3 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+              className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors disabled:opacity-50 disabled:hover:bg-blue-500"
             >
               <Sparkles className="w-5 h-5" />
             </button>
