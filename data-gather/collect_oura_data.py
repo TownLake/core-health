@@ -111,6 +111,10 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching SPO2 data: {e}")
     
+    # Ensure spo2_avg is always present, even if null
+    if 'spo2_avg' not in data:
+        data['spo2_avg'] = None
+
     return data
 
 def main():
