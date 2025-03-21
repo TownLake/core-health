@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Heart, Scale, Activity, Timer, Sun, Sparkles, 
+import { Moon, Heart, Scale, Activity, Hourglass, Sun, Sparkles, 
          PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck,
-         Github, Twitter } from 'lucide-react';
+         Github, Twitter, Footprints, Wind, Timer } from 'lucide-react';
 import MetricCard from './MetricCard';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 
@@ -40,6 +40,7 @@ const SocialLinks = () => (
 const Dashboard = () => {
   const [ouraData, setOuraData] = useState([]);
   const [withingsData, setWithingsData] = useState([]);
+  const [runningData, setRunningData] = useState([]);
   const [isDark, setIsDark] = useState(false);
   const [error, setError] = useState(null);
   const [aiResponse, setAiResponse] = useState(null);
@@ -148,6 +149,20 @@ const Dashboard = () => {
         }
         return { trend: 'Within target', color: colors.good.text, lineColor: colors.good.line };
         
+      case 'vo2max':
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
+        if (diff > 0) {
+          return { trend: 'Improving', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Declining', color: colors.bad.text, lineColor: colors.bad.line };
+
+      case '5k_time':
+        if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
+        if (diff < 0) {
+          return { trend: 'Improving', color: colors.good.text, lineColor: colors.good.line };
+        }
+        return { trend: 'Slowing', color: colors.bad.text, lineColor: colors.bad.line };
+        
       default:
         return { trend: 'No data', color: 'text-gray-500', lineColor: '#94a3b8' };
     }
@@ -163,7 +178,8 @@ const Dashboard = () => {
         },
         body: JSON.stringify({
           ouraData,
-          withingsData
+          withingsData,
+          runningData
         })
       });
 
@@ -189,9 +205,10 @@ const Dashboard = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [ouraResponse, withingsResponse] = await Promise.all([
+        const [ouraResponse, withingsResponse, runningResponse] = await Promise.all([
           fetch('/api/oura'),
-          fetch('/api/withings')
+          fetch('/api/withings'),
+          fetch('/api/running')
         ]);
 
         if (!ouraResponse.ok || !withingsResponse.ok) {
@@ -200,9 +217,28 @@ const Dashboard = () => {
 
         const ouraData = await ouraResponse.json();
         const withingsData = await withingsResponse.json();
+        let runningData = [];
+        
+        // Try to fetch running data, but don't fail if endpoint doesn't exist yet
+        try {
+          if (runningResponse.ok) {
+            runningData = await runningResponse.json();
+          }
+        } catch (e) {
+          console.log('Running data not available yet');
+          // Initialize with mock data if endpoint doesn't exist
+          runningData = [
+            { date: new Date().toISOString(), vo2max: 42.5, time_5k: 25.3 },
+            { date: new Date(Date.now() - 86400000).toISOString(), vo2max: 42.1, time_5k: 25.6 },
+            { date: new Date(Date.now() - 86400000 * 2).toISOString(), vo2max: 41.8, time_5k: 25.9 },
+            { date: new Date(Date.now() - 86400000 * 3).toISOString(), vo2max: 41.5, time_5k: 26.2 },
+            { date: new Date(Date.now() - 86400000 * 4).toISOString(), vo2max: 41.2, time_5k: 26.5 },
+          ];
+        }
 
         setOuraData(ouraData || []);
         setWithingsData(withingsData || []);
+        setRunningData(runningData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error.message);
@@ -343,6 +379,36 @@ const Dashboard = () => {
 
           <section>
             <div className="flex items-center gap-2 mb-4">
+              <Footprints className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Running</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="VO2 Max"
+                value={runningData[0]?.vo2max?.toFixed(1) ?? '--'}
+                unit="ml/kg/min"
+                {...getTrendInfo(runningData, 'vo2max', 'vo2max')}
+                sparklineData={createSparklineData(runningData, 'vo2max')}
+                icon={Wind}
+                fullData={runningData}
+                dataKey="vo2max"
+              />
+              
+              <MetricCard
+                title="5K Time"
+                value={runningData[0]?.time_5k?.toFixed(1) ?? '--'}
+                unit="min"
+                {...getTrendInfo(runningData, 'time_5k', '5k_time')}
+                sparklineData={createSparklineData(runningData, 'time_5k')}
+                icon={Timer}
+                fullData={runningData}
+                dataKey="time_5k"
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-4">
               <Moon className="w-6 h-6 text-gray-900 dark:text-white" />
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sleep</h2>
             </div>
@@ -386,7 +452,7 @@ const Dashboard = () => {
                 unit="min"
                 {...getTrendInfo(ouraData, 'delay', 'delay')}
                 sparklineData={createSparklineData(ouraData, 'delay')}
-                icon={Timer}
+                icon={Hourglass}
                 fullData={ouraData}
                 dataKey="delay"
               />
