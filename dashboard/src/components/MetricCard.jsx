@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+// dashboard/src/components/MetricCard.jsx
+import React, { useState, memo, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { X } from 'lucide-react';
 
-const CustomTooltip = ({ active, payload, label, unit }) => {
+// Memoized tooltip components to prevent unnecessary re-renders
+const CustomTooltip = memo(({ active, payload, label, unit }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
@@ -20,9 +22,9 @@ const CustomTooltip = ({ active, payload, label, unit }) => {
     );
   }
   return null;
-};
+});
 
-const SparklineTooltip = ({ active, payload }) => {
+const SparklineTooltip = memo(({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-slate-800 px-2 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700">
@@ -33,15 +35,28 @@ const SparklineTooltip = ({ active, payload }) => {
     );
   }
   return null;
-};
+});
 
-const DetailedChartModal = ({ isOpen, onClose, title, data, dataKey, unit, icon: Icon }) => {
+// Modal component for detailed chart view
+const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, icon: Icon }) => {
   if (!isOpen) return null;
 
-  const chartData = [...data].reverse();
-  const minValue = Math.min(...chartData.map(d => d[dataKey]));
-  const maxValue = Math.max(...chartData.map(d => d[dataKey]));
-  const padding = (maxValue - minValue) * 0.1;
+  // Memoized chart data preparation
+  const chartData = useMemo(() => {
+    if (!data || !Array.isArray(data)) return [];
+    return [...data].reverse();
+  }, [data]);
+
+  // Memoized min/max calculations
+  const { minValue, maxValue, padding } = useMemo(() => {
+    if (!chartData || chartData.length === 0) {
+      return { minValue: 0, maxValue: 100, padding: 10 };
+    }
+    const min = Math.min(...chartData.map(d => d[dataKey] || 0));
+    const max = Math.max(...chartData.map(d => d[dataKey] || 0));
+    const pad = (max - min) * 0.1;
+    return { minValue: min, maxValue: max, padding: pad };
+  }, [chartData, dataKey]);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -54,6 +69,7 @@ const DetailedChartModal = ({ isOpen, onClose, title, data, dataKey, unit, icon:
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+            aria-label="Close detail view"
           >
             <X className="w-6 h-6 text-gray-500 dark:text-gray-400" />
           </button>
@@ -117,9 +133,10 @@ const DetailedChartModal = ({ isOpen, onClose, title, data, dataKey, unit, icon:
       </div>
     </div>
   );
-};
+});
 
-const MetricCard = ({ 
+// Memoized MetricCard component to prevent unnecessary re-renders
+const MetricCard = memo(({ 
   title, 
   value, 
   unit, 
@@ -132,7 +149,9 @@ const MetricCard = ({
   dataKey 
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const gradientId = `sparkline-${dataKey}-gradient`;
+  
+  // Generate unique gradientId for each metric
+  const gradientId = useMemo(() => `sparkline-${dataKey}-gradient`, [dataKey]);
 
   return (
     <>
@@ -178,7 +197,7 @@ const MetricCard = ({
                     fillOpacity={1}
                     fill={`url(#${gradientId})`}
                     dot={false}
-                    isAnimationActive={true}
+                    isAnimationActive={false} // Disable animation for better performance
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -198,6 +217,12 @@ const MetricCard = ({
       />
     </>
   );
-};
+});
+
+// Add display names for better debugging
+MetricCard.displayName = 'MetricCard';
+DetailedChartModal.displayName = 'DetailedChartModal';
+CustomTooltip.displayName = 'CustomTooltip';
+SparklineTooltip.displayName = 'SparklineTooltip';
 
 export default MetricCard;
