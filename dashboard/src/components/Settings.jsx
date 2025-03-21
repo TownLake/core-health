@@ -1,6 +1,5 @@
 // dashboard/src/components/Settings.jsx
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { useHealthData } from '../store/HealthDataContext';
 import { ArrowLeft, Moon, Sun, RefreshCw } from 'lucide-react';
 
@@ -15,13 +14,6 @@ const Settings = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-2 mb-6">
-          <Link 
-            to="/"
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 transition-colors"
-            aria-label="Back to dashboard"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
         </div>
         
