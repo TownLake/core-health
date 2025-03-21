@@ -21,9 +21,10 @@ export async function onRequest(context) {
   
       console.log('Querying running data...');
       const data = await env.DB.prepare(`
-        SELECT * FROM running_data 
+        SELECT date, collected_at, five_k_minutes, vo2_max
+        FROM running_data 
         ORDER BY date DESC 
-        LIMIT 30
+        LIMIT 60
       `).all();
   
       console.log('Running data retrieved:', data);

@@ -228,11 +228,11 @@ const Dashboard = () => {
           console.log('Running data not available yet');
           // Initialize with mock data if endpoint doesn't exist
           runningData = [
-            { date: new Date().toISOString(), vo2max: 42.5, time_5k: 25.3 },
-            { date: new Date(Date.now() - 86400000).toISOString(), vo2max: 42.1, time_5k: 25.6 },
-            { date: new Date(Date.now() - 86400000 * 2).toISOString(), vo2max: 41.8, time_5k: 25.9 },
-            { date: new Date(Date.now() - 86400000 * 3).toISOString(), vo2max: 41.5, time_5k: 26.2 },
-            { date: new Date(Date.now() - 86400000 * 4).toISOString(), vo2max: 41.2, time_5k: 26.5 },
+            { date: new Date().toISOString(), vo2_max: 42.5, five_k_minutes: 25.3 },
+            { date: new Date(Date.now() - 86400000).toISOString(), vo2_max: 42.1, five_k_minutes: 25.6 },
+            { date: new Date(Date.now() - 86400000 * 2).toISOString(), vo2_max: 41.8, five_k_minutes: 25.9 },
+            { date: new Date(Date.now() - 86400000 * 3).toISOString(), vo2_max: 41.5, five_k_minutes: 26.2 },
+            { date: new Date(Date.now() - 86400000 * 4).toISOString(), vo2_max: 41.2, five_k_minutes: 26.5 },
           ];
         }
 
@@ -379,36 +379,6 @@ const Dashboard = () => {
 
           <section>
             <div className="flex items-center gap-2 mb-4">
-              <Footprints className="w-6 h-6 text-gray-900 dark:text-white" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Running</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <MetricCard
-                title="VO2 Max"
-                value={runningData[0]?.vo2max?.toFixed(1) ?? '--'}
-                unit="ml/kg/min"
-                {...getTrendInfo(runningData, 'vo2max', 'vo2max')}
-                sparklineData={createSparklineData(runningData, 'vo2max')}
-                icon={Wind}
-                fullData={runningData}
-                dataKey="vo2max"
-              />
-              
-              <MetricCard
-                title="5K Time"
-                value={runningData[0]?.time_5k?.toFixed(1) ?? '--'}
-                unit="min"
-                {...getTrendInfo(runningData, 'time_5k', '5k_time')}
-                sparklineData={createSparklineData(runningData, 'time_5k')}
-                icon={Timer}
-                fullData={runningData}
-                dataKey="time_5k"
-              />
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-center gap-2 mb-4">
               <Moon className="w-6 h-6 text-gray-900 dark:text-white" />
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sleep</h2>
             </div>
@@ -455,6 +425,36 @@ const Dashboard = () => {
                 icon={Hourglass}
                 fullData={ouraData}
                 dataKey="delay"
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Footprints className="w-6 h-6 text-gray-900 dark:text-white" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Running</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MetricCard
+                title="VO2 Max"
+                value={runningData[0]?.vo2_max?.toFixed(1) ?? '--'}
+                unit="ml/kg/min"
+                {...getTrendInfo(runningData, 'vo2_max', 'vo2max')}
+                sparklineData={createSparklineData(runningData, 'vo2_max')}
+                icon={Wind}
+                fullData={runningData}
+                dataKey="vo2_max"
+              />
+              
+              <MetricCard
+                title="5K Time"
+                value={runningData[0]?.five_k_minutes?.toFixed(1) ?? '--'}
+                unit="min"
+                {...getTrendInfo(runningData, 'five_k_minutes', '5k_time')}
+                sparklineData={createSparklineData(runningData, 'five_k_minutes')}
+                icon={Timer}
+                fullData={runningData}
+                dataKey="five_k_minutes"
               />
             </div>
           </section>
