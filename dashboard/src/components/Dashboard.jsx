@@ -1,8 +1,9 @@
 // dashboard/src/components/Dashboard.jsx
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Moon, Heart, Scale, Activity, Hourglass, Sun, Sparkles, 
          PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck,
-         Footprints, Wind, Timer } from 'lucide-react';
+         Footprints, Wind, Timer, Pill } from 'lucide-react';
 import MetricCard from './MetricCard';
 import { useHealthData } from '../store/HealthDataContext';
 import { getTrendInfo, createSparklineData, hasValidData } from '../utils/dataUtils';
@@ -49,6 +50,13 @@ const Dashboard = () => {
             >
               <Sparkles className="w-5 h-5" />
             </button>
+            <Link
+              to="/supplements"
+              aria-label="View Supplements"
+              className="p-3 rounded-full bg-green-500 hover:bg-green-600 text-white transition-colors"
+            >
+              <Pill className="w-5 h-5" />
+            </Link>
             <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
           </div>
         </div>
