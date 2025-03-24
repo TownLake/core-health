@@ -50,10 +50,10 @@ const Dashboard = ({ navigateTo }) => {
               <Sparkles className="w-5 h-5" />
             </button>
             <button
-              onClick={() => navigateTo('supplements')}
+              onClick={() => navigateTo('/supplements')}
               aria-label="View Supplements"
-              className="p-3 rounded-full bg-purple-400 hover:bg-purple-500 text-white transition-colors"
-              >
+              className="p-3 rounded-full bg-pink-400 hover:bg-pink-500 text-white transition-colors"
+            >
               <Pill className="w-5 h-5" />
             </button>
             <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
