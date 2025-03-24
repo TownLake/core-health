@@ -57,6 +57,101 @@ const SparklineTooltip = memo(({ active, payload }) => {
   return null;
 });
 
+// Separate daily chart component
+const DailyChart = memo(({ chartData, dataKey, unit, lineColor, minValue, maxValue, padding }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+      <defs>
+        <linearGradient id={`detailGradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor={lineColor || "#3B82F6"} stopOpacity={0.3}/>
+          <stop offset="95%" stopColor={lineColor || "#3B82F6"} stopOpacity={0}/>
+        </linearGradient>
+      </defs>
+      <CartesianGrid 
+        strokeDasharray="3 3" 
+        vertical={false}
+        stroke="#E5E7EB"
+        className="dark:opacity-20"
+      />
+      <XAxis 
+        dataKey="date" 
+        stroke="#6B7280"
+        tickFormatter={(date) => new Date(date).toLocaleDateString(undefined, { 
+          month: 'short', 
+          day: 'numeric' 
+        })}
+        tick={{ fill: '#6B7280' }}
+        tickLine={{ stroke: '#6B7280' }}
+        axisLine={{ stroke: '#E5E7EB' }}
+        className="dark:opacity-50"
+      />
+      <YAxis 
+        stroke="#6B7280"
+        domain={[minValue - padding, maxValue + padding]}
+        tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
+        tick={{ fill: '#6B7280' }}
+        tickLine={{ stroke: '#6B7280' }}
+        axisLine={{ stroke: '#E5E7EB' }}
+        className="dark:opacity-50"
+      />
+      <Tooltip content={<CustomTooltip unit={unit} />} />
+      <Area
+        type="monotone"
+        dataKey={dataKey}
+        stroke={lineColor || "#3B82F6"}
+        strokeWidth={2}
+        fillOpacity={1}
+        fill={`url(#detailGradient-${dataKey})`}
+        dot={false}
+        activeDot={{ 
+          r: 6, 
+          stroke: lineColor || "#3B82F6",
+          strokeWidth: 2,
+          fill: '#FFFFFF'
+        }}
+      />
+    </AreaChart>
+  </ResponsiveContainer>
+));
+
+// Separate monthly chart component
+const MonthlyChart = memo(({ monthlyData, unit, lineColor, minValue, maxValue, padding }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+      <CartesianGrid 
+        strokeDasharray="3 3" 
+        vertical={false}
+        stroke="#E5E7EB"
+        className="dark:opacity-20"
+      />
+      <XAxis 
+        dataKey="monthName" 
+        stroke="#6B7280"
+        tick={{ fill: '#6B7280' }}
+        tickLine={{ stroke: '#6B7280' }}
+        axisLine={{ stroke: '#E5E7EB' }}
+        className="dark:opacity-50"
+      />
+      <YAxis 
+        stroke="#6B7280"
+        domain={[minValue - padding, maxValue + padding]}
+        tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
+        tick={{ fill: '#6B7280' }}
+        tickLine={{ stroke: '#6B7280' }}
+        axisLine={{ stroke: '#E5E7EB' }}
+        className="dark:opacity-50"
+      />
+      <Tooltip content={<MonthlyTooltip unit={unit} />} />
+      <Bar 
+        dataKey="average" 
+        fill={lineColor || "#3B82F6"} 
+        radius={[4, 4, 0, 0]}
+        maxBarSize={50}
+      />
+    </BarChart>
+  </ResponsiveContainer>
+));
+
 // Modal component for detailed chart view
 const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, icon: Icon, lineColor }) => {
   const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'monthly'
@@ -75,7 +170,7 @@ const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, 
   }, [data, dataKey]);
 
   // Memoized min/max calculations for daily view
-  const { minValue, maxValue, padding } = useMemo(() => {
+  const dailyChartValues = useMemo(() => {
     if (!chartData || chartData.length === 0) {
       return { minValue: 0, maxValue: 100, padding: 10 };
     }
@@ -87,15 +182,15 @@ const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, 
   }, [chartData, dataKey]);
 
   // Memoized min/max calculations for monthly view
-  const { monthlyMinValue, monthlyMaxValue, monthlyPadding } = useMemo(() => {
+  const monthlyChartValues = useMemo(() => {
     if (!monthlyData || monthlyData.length === 0) {
-      return { monthlyMinValue: 0, monthlyMaxValue: 100, monthlyPadding: 10 };
+      return { minValue: 0, maxValue: 100, padding: 10 };
     }
     const values = monthlyData.map(d => d.average).filter(v => v !== null && v !== undefined);
     const min = Math.min(...values);
     const max = Math.max(...values);
     const pad = (max - min) * 0.1;
-    return { monthlyMinValue: min, monthlyMaxValue: max, monthlyPadding: pad };
+    return { minValue: min, maxValue: max, padding: pad };
   }, [monthlyData]);
 
   // View toggle handler
@@ -134,94 +229,24 @@ const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, 
         
         <div className="h-[400px] w-full">
           {viewMode === 'daily' ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={`detailGradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={lineColor || "#3B82F6"} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={lineColor || "#3B82F6"} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  vertical={false}
-                  stroke="#E5E7EB"
-                  className="dark:opacity-20"
-                />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#6B7280"
-                  tickFormatter={(date) => new Date(date).toLocaleDateString(undefined, { 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
-                  tick={{ fill: '#6B7280' }}
-                  tickLine={{ stroke: '#6B7280' }}
-                  axisLine={{ stroke: '#E5E7EB' }}
-                  className="dark:opacity-50"
-                />
-                <YAxis 
-                  stroke="#6B7280"
-                  domain={[minValue - padding, maxValue + padding]}
-                  tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
-                  tick={{ fill: '#6B7280' }}
-                  tickLine={{ stroke: '#6B7280' }}
-                  axisLine={{ stroke: '#E5E7EB' }}
-                  className="dark:opacity-50"
-                />
-                <Tooltip content={<CustomTooltip unit={unit} />} />
-                <Area
-                  type="monotone"
-                  dataKey={dataKey}
-                  stroke={lineColor || "#3B82F6"}
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill={`url(#detailGradient-${dataKey})`}
-                  dot={false}
-                  activeDot={{ 
-                    r: 6, 
-                    stroke: lineColor || "#3B82F6",
-                    strokeWidth: 2,
-                    fill: '#FFFFFF'
-                  }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <DailyChart
+              chartData={chartData}
+              dataKey={dataKey}
+              unit={unit}
+              lineColor={lineColor}
+              minValue={dailyChartValues.minValue}
+              maxValue={dailyChartValues.maxValue}
+              padding={dailyChartValues.padding}
+            />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  vertical={false}
-                  stroke="#E5E7EB"
-                  className="dark:opacity-20"
-                />
-                <XAxis 
-                  dataKey="monthName" 
-                  stroke="#6B7280"
-                  tick={{ fill: '#6B7280' }}
-                  tickLine={{ stroke: '#6B7280' }}
-                  axisLine={{ stroke: '#E5E7EB' }}
-                  className="dark:opacity-50"
-                />
-                <YAxis 
-                  stroke="#6B7280"
-                  domain={[monthlyMinValue - monthlyPadding, monthlyMaxValue + monthlyPadding]}
-                  tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
-                  tick={{ fill: '#6B7280' }}
-                  tickLine={{ stroke: '#6B7280' }}
-                  axisLine={{ stroke: '#E5E7EB' }}
-                  className="dark:opacity-50"
-                />
-                <Tooltip content={<MonthlyTooltip unit={unit} />} />
-                <Bar 
-                  dataKey="average" 
-                  fill={lineColor || "#3B82F6"} 
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={50}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <MonthlyChart
+              monthlyData={monthlyData}
+              unit={unit}
+              lineColor={lineColor}
+              minValue={monthlyChartValues.minValue}
+              maxValue={monthlyChartValues.maxValue}
+              padding={monthlyChartValues.padding}
+            />
           )}
         </div>
       </div>
@@ -300,16 +325,18 @@ const MetricCard = memo(({
         </div>
       </div>
 
-      <DetailedChartModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={title}
-        data={fullData}
-        dataKey={dataKey}
-        unit={unit}
-        icon={Icon}
-        lineColor={lineColor}
-      />
+      {isModalOpen && (
+        <DetailedChartModal
+          isOpen={true}
+          onClose={() => setIsModalOpen(false)}
+          title={title}
+          data={fullData}
+          dataKey={dataKey}
+          unit={unit}
+          icon={Icon}
+          lineColor={lineColor}
+        />
+      )}
     </>
   );
 });
@@ -320,5 +347,7 @@ DetailedChartModal.displayName = 'DetailedChartModal';
 CustomTooltip.displayName = 'CustomTooltip';
 SparklineTooltip.displayName = 'SparklineTooltip';
 MonthlyTooltip.displayName = 'MonthlyTooltip';
+DailyChart.displayName = 'DailyChart';
+MonthlyChart.displayName = 'MonthlyChart';
 
 export default MetricCard;
