@@ -19,8 +19,7 @@ const Supplements = ({ navigateTo }) => {
         setMarkdownContent(text);
       } catch (error) {
         console.error('Error loading supplements data:', error);
-        // Fallback content in case file can't be loaded
-        setMarkdownContent(`# Supplements\n\nNo supplement data available.`);
+        setMarkdownContent(`# My Supplement Routine\n\nNo supplement data available.`);
       } finally {
         setIsLoading(false);
       }
@@ -31,109 +30,86 @@ const Supplements = ({ navigateTo }) => {
 
   // Parse markdown content into HTML
   const renderMarkdownContent = () => {
-    // Basic markdown parser
     const lines = markdownContent.split('\n');
-    let htmlContent = '';
-    let tableHtml = '';
-    let title = 'Supplements';
+    let mainTitle = 'My Supplement Routine';
+    let introduction = '';
+    let cards = [];
     
-    // Find the first h1 title
-    const titleLine = lines.find(line => line.trim().startsWith('# '));
-    if (titleLine) {
-      title = titleLine.substring(2).trim();
-    }
+    let currentCard = null;
+    let currentSection = 'intro';
     
     // Process line by line
-    let i = 0;
-    let inTable = false;
-    let tableHeaders = [];
-    let tableRows = [];
-    
-    while (i < lines.length) {
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
       // Skip empty lines
       if (!line) {
-        i++;
         continue;
       }
       
-      // Detect table start - look for a line with multiple pipe characters
-      if (!inTable && line.includes('|') && !line.startsWith('# ') && !line.startsWith('## ')) {
-        inTable = true;
-        
-        // Extract headers
-        tableHeaders = line.split('|')
-          .map(cell => cell.trim())
-          .filter(cell => cell);
-        
-        // Skip the separator line
-        i += 2;
+      // Extract main title (first h1)
+      if (line.startsWith('# ') && !mainTitle) {
+        mainTitle = line.substring(2).trim();
         continue;
       }
       
-      // Process table rows
-      if (inTable && line.includes('|')) {
-        const cells = line.split('|')
-          .map(cell => cell.trim())
-          .filter(cell => cell);
-        
-        if (cells.length > 0) {
-          tableRows.push(cells);
+      // Detect card start (h2 headings)
+      if (line.startsWith('## ')) {
+        // Save previous card if exists
+        if (currentCard) {
+          cards.push(currentCard);
         }
         
-        i++;
+        // Start new card
+        currentCard = {
+          name: line.substring(3).trim(),
+          details: []
+        };
+        
+        currentSection = 'card';
         continue;
       }
       
-      // End of table detection
-      if (inTable && !line.includes('|')) {
-        inTable = false;
+      // Process card content (list items)
+      if (currentSection === 'card' && line.startsWith('- ')) {
+        const content = line.substring(2).trim();
+        
+        // Extract property and value from markdown formatting
+        if (content.includes('**') && content.includes(':')) {
+          const parts = content.split(':');
+          if (parts.length >= 2) {
+            const property = parts[0].replace(/\*\*/g, '').trim();
+            const value = parts.slice(1).join(':').trim();
+            
+            currentCard.details.push({ property, value });
+          }
+        } else {
+          // For simple list items without property formatting
+          currentCard.details.push({ 
+            property: '', 
+            value: content.replace(/\*\*/g, '')
+          });
+        }
+        
+        continue;
       }
       
-      // Handle headers
-      if (line.startsWith('# ') && !line.startsWith('## ') && line !== titleLine) {
-        htmlContent += `<h1 class="text-2xl font-bold mt-6 mb-4">${line.substring(2)}</h1>`;
-      } else if (line.startsWith('## ')) {
-        htmlContent += `<h2 class="text-xl font-bold mt-5 mb-3">${line.substring(3)}</h2>`;
-      } else if (line.startsWith('### ')) {
-        htmlContent += `<h3 class="text-lg font-bold mt-4 mb-2">${line.substring(4)}</h3>`;
-      } 
-      // Handle paragraphs (not headers, not in table)
-      else if (!line.startsWith('# ') && !inTable && !line.includes('|---')) {
-        htmlContent += `<p class="mb-4">${line}</p>`;
+      // Collect introduction text (paragraphs before any cards)
+      if (currentSection === 'intro' && !line.startsWith('# ')) {
+        introduction += `<p class="mb-4">${line}</p>`;
       }
-      
-      i++;
     }
     
-    // Generate table HTML if we have headers and rows
-    if (tableHeaders.length > 0 && tableRows.length > 0) {
-      tableHtml = `
-        <table class="w-full border-collapse mt-4">
-          <thead>
-            <tr class="bg-gray-100 dark:bg-slate-700 border-b border-gray-200 dark:border-gray-700">
-              ${tableHeaders.map(header => 
-                `<th class="py-3 px-4 text-left font-medium">${header}</th>`
-              ).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows.map(row => `
-              <tr class="border-b border-gray-200 dark:border-gray-700">
-                ${row.map(cell => `<td class="py-3 px-4">${cell}</td>`).join('')}
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+    // Add the last card if exists
+    if (currentCard) {
+      cards.push(currentCard);
     }
     
-    return { title, content: htmlContent, table: tableHtml };
+    return { title: mainTitle, introduction, cards };
   };
 
-  const { title, content, table } = isLoading 
-    ? { title: 'Supplements', content: '', table: '' } 
+  const { title, introduction, cards } = isLoading 
+    ? { title: 'My Supplement Routine', introduction: '', cards: [] } 
     : renderMarkdownContent();
 
   return (
@@ -159,9 +135,42 @@ const Supplements = ({ navigateTo }) => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
           ) : (
-            <div className="prose dark:prose-invert max-w-none">
-              {content && <div dangerouslySetInnerHTML={{ __html: content }} />}
-              {table && <div dangerouslySetInnerHTML={{ __html: table }} />}
+            <div>
+              {/* Introduction section */}
+              {introduction && (
+                <div 
+                  className="prose dark:prose-invert max-w-none mb-8" 
+                  dangerouslySetInnerHTML={{ __html: introduction }} 
+                />
+              )}
+              
+              {/* Cards grid - responsive 1 column on mobile, 2 columns on larger screens */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {cards.map((card, cardIndex) => (
+                  <div 
+                    key={cardIndex}
+                    className="bg-gray-50 dark:bg-slate-700 rounded-lg p-5 shadow-sm"
+                  >
+                    <h3 className="font-bold text-lg mb-3 text-gray-900 dark:text-white">
+                      {card.name}
+                    </h3>
+                    <div className="space-y-2">
+                      {card.details.map((detail, detailIndex) => (
+                        <div key={detailIndex} className="flex flex-col">
+                          {detail.property && (
+                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                              {detail.property}
+                            </span>
+                          )}
+                          <span className={detail.property ? "mt-1" : ""}>
+                            {detail.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
