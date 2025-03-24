@@ -101,7 +101,8 @@ export const getTrendInfo = (data, key, metric) => {
       }
       return { trend: 'Declining', color: colors.bad.text, lineColor: colors.bad.line };
 
-    case '5k_time':
+    // Updated case name from '5k_time' to 'five_k_seconds'
+    case 'five_k_seconds':
       if (stable) return { trend: 'Stable', color: colors.stable.text, lineColor: colors.stable.line };
       if (diff < 0) {
         return { trend: 'Improving', color: colors.good.text, lineColor: colors.good.line };
@@ -180,4 +181,17 @@ export const createMonthlyAverageData = (data, key) => {
         count: group.values.length
       };
     });
+};
+
+/**
+ * Formats seconds to MM:SS display format
+ * @param {Number} seconds - The seconds to format
+ * @returns {String} Formatted time as MM:SS 
+ */
+export const formatSecondsToMMSS = (seconds) => {
+  if (seconds === null || seconds === undefined) return '--:--';
+  
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };

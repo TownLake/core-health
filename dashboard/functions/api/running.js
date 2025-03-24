@@ -45,6 +45,7 @@ export async function onRequest(context) {
     }
 
     console.log('Querying Running data...');
+    // Updated to use five_k_seconds instead of five_k_minutes
     const data = await env.DB.prepare(`
       SELECT * FROM running_data 
       ORDER BY date DESC 
@@ -57,8 +58,16 @@ export async function onRequest(context) {
 
     console.log('Running data retrieved:', data.results.length, 'records');
     
+    // Add MM:SS formatted time to each record
+    const formattedData = data.results.map(record => {
+      if (record.five_k_seconds !== undefined && record.five_k_seconds !== null) {
+        record.five_k_formatted = formatSecondsToMMSS(record.five_k_seconds);
+      }
+      return record;
+    });
+    
     const response = new Response(
-      JSON.stringify(data.results || []), 
+      JSON.stringify(formattedData || []), 
       { headers }
     );
 
@@ -95,23 +104,33 @@ async function checkTableExists(db, tableName) {
   }
 }
 
+// Helper function to format seconds to MM:SS
+function formatSecondsToMMSS(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 // Helper function to generate mock running data when the API is first deployed
 function generateMockRunningData(days) {
   const data = [];
   const baseVo2Max = 42.5;
-  const base5kTime = 25.3;
+  const base5kTimeSeconds = 1518; // 25.3 minutes in seconds (converted from minutes to seconds)
   
   for (let i = 0; i < days; i++) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     
     // Generate some variation in the mock data
-    const randomVariation = () => (Math.random() - 0.5) * 0.5;
+    const randomVariation = () => (Math.random() - 0.5) * 30; // Variation in seconds
+    
+    const seconds = base5kTimeSeconds + (i * 6) + randomVariation();
     
     data.push({
       date: date.toISOString(),
-      vo2_max: baseVo2Max - (i * 0.1) + randomVariation(),
-      five_k_minutes: base5kTime + (i * 0.1) + randomVariation()
+      vo2_max: baseVo2Max - (i * 0.1) + ((Math.random() - 0.5) * 0.5),
+      five_k_seconds: seconds,
+      five_k_formatted: formatSecondsToMMSS(seconds)
     });
   }
   
