@@ -6,6 +6,7 @@ import SocialLinks from './SocialLinks';
 
 const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   const dosage = supplement.properties.Dosage || '';
+  const source = supplement.properties.Source ? supplement.properties.Source.split(' ')[0] : '';
   const icon = supplement.emoji;
   
   return (
@@ -15,16 +16,16 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
     >
       <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
         {icon && <span className="text-xl mr-2">{icon}</span>}
-        <span className="text-sm">{supplement.name}</span>
+        <span className="text-sm">{source}</span>
       </div>
       
       <div className="flex justify-between items-end mt-auto">
         <div className="space-y-1">
           <div className="text-4xl font-semibold text-gray-900 dark:text-white">
-            {dosage}
+            {supplement.name}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {supplement.properties.Source ? supplement.properties.Source.split(' ')[0] : ''}
+            {dosage}
           </div>
         </div>
         
@@ -60,19 +61,19 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
 
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
-    <div>
-      <div className="flex items-center mb-4">
+    <section>
+      <div className="flex items-center gap-2 mb-4">
         {category.emoji && (
-          <span className="text-2xl text-gray-700 dark:text-gray-300 mr-2">
+          <span className="w-6 h-6 text-gray-900 dark:text-white text-xl">
             {category.emoji}
           </span>
         )}
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {category.name}
         </h2>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 auto-rows-fr">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
         {category.supplements.map((supplement, supplementIndex) => {
           const cardId = `${categoryIndex}-${supplementIndex}`;
           const isExpanded = expandedCards[cardId] || false;
@@ -89,7 +90,7 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
           );
         })}
       </div>
-    </div>
+    </section>
   );
 };
 
