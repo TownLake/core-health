@@ -32,12 +32,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="p-6">
-        {/* Title only (navigation is in main App component) */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today</h1>
-        </div>
-        
+      <div>
         {error && <ErrorView message={error} />}
 
         {aiResponse && !isAnalyzing && <AIInsightsCard response={aiResponse} />}
@@ -71,7 +66,6 @@ const Dashboard = () => {
             ]}
           />
 
-          {/* Other metric sections remain unchanged */}
           <MetricSection
             title="Body"
             icon={ClipboardCheck}

@@ -246,12 +246,7 @@ const Supplements = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="p-6">
-        {/* Title only (navigation is in main App component) */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-        </div>
-
+      <div>
         {/* Introduction section if any */}
         {introduction && (
           <div 
