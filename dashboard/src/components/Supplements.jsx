@@ -10,21 +10,21 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   
   return (
     <div 
-      className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
+      className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col h-full"
       onClick={() => toggleCard(cardId)}
     >
-      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
+      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-2">
         {icon && <span className="text-xl mr-2">{icon}</span>}
         <span className="text-sm">{supplement.name}</span>
       </div>
       
-      <div className="flex justify-between items-end">
-        <div className="space-y-1">
-          <div className="text-4xl font-semibold text-gray-900 dark:text-white">
+      <div className="flex justify-between items-end mt-auto">
+        <div>
+          <div className="text-4xl font-semibold text-gray-900 dark:text-white truncate max-w-[150px]">
             {dosage}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {supplement.properties.Source || ''}
+            {supplement.properties.Source ? supplement.properties.Source.split(' ')[0] : ''}
           </div>
         </div>
         
@@ -35,20 +35,20 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
       
       {/* Expanded details */}
       {isExpanded && (
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           {Object.entries(supplement.properties)
             .filter(([key]) => key !== 'Dosage' && key !== 'Source')
             .map(([key, value], propIndex) => (
-              <div key={propIndex} className="mb-2">
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <div key={propIndex} className="mb-1 text-sm">
+                <span className="font-medium text-gray-500 dark:text-gray-400">
                   {key}:
                 </span>
-                <span className="ml-2 text-gray-700 dark:text-gray-300">{value}</span>
+                <span className="ml-1 text-gray-700 dark:text-gray-300">{value}</span>
               </div>
             ))}
           
           {supplement.details && (
-            <div className="mt-2 text-gray-700 dark:text-gray-300 text-sm">
+            <div className="mt-1 text-gray-700 dark:text-gray-300 text-sm">
               {supplement.details}
             </div>
           )}
@@ -60,25 +60,26 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
 
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
-    <div className="mb-8">
+    <div>
       <div className="flex items-center mb-4">
         {category.emoji && <span className="text-2xl mr-2">{category.emoji}</span>}
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">{category.name}</h2>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 auto-rows-fr">
         {category.supplements.map((supplement, supplementIndex) => {
           const cardId = `${categoryIndex}-${supplementIndex}`;
           const isExpanded = expandedCards[cardId] || false;
           
           return (
-            <SupplementCard
-              key={supplementIndex}
-              supplement={supplement}
-              cardId={cardId}
-              isExpanded={isExpanded}
-              toggleCard={toggleCard}
-            />
+            <div key={supplementIndex} className={isExpanded ? 'row-span-2' : ''}>
+              <SupplementCard
+                supplement={supplement}
+                cardId={cardId}
+                isExpanded={isExpanded}
+                toggleCard={toggleCard}
+              />
+            </div>
           );
         })}
       </div>

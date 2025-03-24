@@ -1,13 +1,26 @@
 // dashboard/src/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { HealthDataProvider } from './store/HealthDataContext';
-import Dashboard from './components/Dashboard';
-import Supplements from './components/Supplements';
 import { Home, Pill, Sparkles, Moon, Sun } from 'lucide-react';
 import { useHealthData } from './store/HealthDataContext';
 
+// Lazy load components to prevent flash
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Supplements = lazy(() => import('./components/Supplements'));
+
+// Loading fallback
+const PageLoading = () => (
+  <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+  </div>
+);
+
 function AppContent() {
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  // Initialize path from window.location before component mounts
+  const [currentPath, setCurrentPath] = useState(() => {
+    return window.location.pathname === '/supplements' ? '/supplements' : '/';
+  });
+  
   const { 
     theme, 
     toggleTheme, 
@@ -18,7 +31,7 @@ function AppContent() {
   useEffect(() => {
     // Update path when browser history changes (back/forward buttons)
     const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
+      setCurrentPath(window.location.pathname === '/supplements' ? '/supplements' : '/');
     };
 
     window.addEventListener('popstate', handleLocationChange);
@@ -27,6 +40,7 @@ function AppContent() {
 
   // Function to navigate programmatically
   const navigate = (path) => {
+    if (currentPath === path) return; // Prevent unnecessary renders
     window.history.pushState({}, '', path);
     setCurrentPath(path);
   };
@@ -40,6 +54,14 @@ function AppContent() {
     } else {
       getAIInsights();
     }
+  };
+
+  // Determine which component to render
+  const renderComponent = () => {
+    if (currentPath === '/supplements') {
+      return <Supplements />;
+    }
+    return <Dashboard />;
   };
 
   return (
@@ -90,23 +112,10 @@ function AppContent() {
           </button>
         </div>
 
-        {/* Page Content */}
-        {currentPath === '/' && <Dashboard />}
-        {currentPath === '/supplements' && <Supplements />}
-        
-        {/* Fallback for unknown routes */}
-        {currentPath !== '/' && currentPath !== '/supplements' && (
-          <div className="flex flex-col items-center justify-center h-screen p-4 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Page Not Found</h1>
-            <p className="text-gray-700 dark:text-gray-300 mb-6">The page you're looking for doesn't exist.</p>
-            <button 
-              onClick={() => navigate('/')}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-            >
-              Go to Dashboard
-            </button>
-          </div>
-        )}
+        {/* Page Content with Suspense for loading state */}
+        <Suspense fallback={<PageLoading />}>
+          {renderComponent()}
+        </Suspense>
       </div>
     </div>
   );
