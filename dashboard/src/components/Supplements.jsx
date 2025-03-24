@@ -1,12 +1,13 @@
 // dashboard/src/components/Supplements.jsx
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Pill } from 'lucide-react';
+import { ArrowLeft, Pill, ChevronDown, ChevronUp } from 'lucide-react';
 import { useHealthData } from '../store/HealthDataContext';
 
 const Supplements = ({ navigateTo }) => {
   const { theme } = useHealthData();
   const [markdownContent, setMarkdownContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedCards, setExpandedCards] = useState({});
 
   useEffect(() => {
     const fetchMarkdown = async () => {
@@ -28,14 +29,22 @@ const Supplements = ({ navigateTo }) => {
     fetchMarkdown();
   }, []);
 
-  // Parse markdown content into HTML
-  const renderMarkdownContent = () => {
+  const toggleCard = (cardId) => {
+    setExpandedCards(prev => ({
+      ...prev,
+      [cardId]: !prev[cardId]
+    }));
+  };
+
+  // Parse markdown content into structured data
+  const parseMarkdownContent = () => {
     const lines = markdownContent.split('\n');
     let mainTitle = 'My Supplement Routine';
     let introduction = '';
-    let cards = [];
+    let categories = [];
     
-    let currentCard = null;
+    let currentCategory = null;
+    let currentSupplement = null;
     let currentSection = 'intro';
     
     // Process line by line
@@ -48,30 +57,48 @@ const Supplements = ({ navigateTo }) => {
       }
       
       // Extract main title (first h1)
-      if (line.startsWith('# ') && !mainTitle) {
+      if (line.startsWith('# ')) {
         mainTitle = line.substring(2).trim();
         continue;
       }
       
-      // Detect card start (h2 headings)
+      // Detect category start (h2 headings)
       if (line.startsWith('## ')) {
-        // Save previous card if exists
-        if (currentCard) {
-          cards.push(currentCard);
+        // Save previous category if exists
+        if (currentCategory) {
+          categories.push(currentCategory);
         }
         
-        // Start new card
-        currentCard = {
+        // Start new category
+        currentCategory = {
           name: line.substring(3).trim(),
-          details: []
+          supplements: []
         };
         
-        currentSection = 'card';
+        currentSection = 'category';
         continue;
       }
       
-      // Process card content (list items)
-      if (currentSection === 'card' && line.startsWith('- ')) {
+      // Detect supplement start (h3 headings)
+      if (line.startsWith('### ')) {
+        // Save previous supplement if exists
+        if (currentSupplement && currentCategory) {
+          currentCategory.supplements.push(currentSupplement);
+        }
+        
+        // Start new supplement
+        currentSupplement = {
+          name: line.substring(4).trim(),
+          properties: {},
+          details: ''
+        };
+        
+        currentSection = 'supplement';
+        continue;
+      }
+      
+      // Process supplement properties (list items)
+      if (currentSection === 'supplement' && line.startsWith('- ')) {
         const content = line.substring(2).trim();
         
         // Extract property and value from markdown formatting
@@ -81,36 +108,38 @@ const Supplements = ({ navigateTo }) => {
             const property = parts[0].replace(/\*\*/g, '').trim();
             const value = parts.slice(1).join(':').trim();
             
-            currentCard.details.push({ property, value });
+            currentSupplement.properties[property] = value;
           }
-        } else {
-          // For simple list items without property formatting
-          currentCard.details.push({ 
-            property: '', 
-            value: content.replace(/\*\*/g, '')
-          });
+        } else if (content.includes('**Details**:')) {
+          // Extract details after "Details:" prefix
+          currentSupplement.details = content.replace('**Details**:', '').trim();
         }
         
         continue;
       }
       
-      // Collect introduction text (paragraphs before any cards)
+      // Collect introduction text (paragraphs before any categories)
       if (currentSection === 'intro' && !line.startsWith('# ')) {
         introduction += `<p class="mb-4">${line}</p>`;
       }
     }
     
-    // Add the last card if exists
-    if (currentCard) {
-      cards.push(currentCard);
+    // Add the last supplement if exists
+    if (currentSupplement && currentCategory) {
+      currentCategory.supplements.push(currentSupplement);
     }
     
-    return { title: mainTitle, introduction, cards };
+    // Add the last category if exists
+    if (currentCategory) {
+      categories.push(currentCategory);
+    }
+    
+    return { title: mainTitle, introduction, categories };
   };
 
-  const { title, introduction, cards } = isLoading 
-    ? { title: 'My Supplement Routine', introduction: '', cards: [] } 
-    : renderMarkdownContent();
+  const { title, introduction, categories } = isLoading 
+    ? { title: 'My Supplement Routine', introduction: '', categories: [] } 
+    : parseMarkdownContent();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6">
@@ -144,29 +173,62 @@ const Supplements = ({ navigateTo }) => {
                 />
               )}
               
-              {/* Cards grid - responsive 1 column on mobile, 2 columns on larger screens */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {cards.map((card, cardIndex) => (
-                  <div 
-                    key={cardIndex}
-                    className="bg-gray-50 dark:bg-slate-700 rounded-lg p-5 shadow-sm"
-                  >
-                    <h3 className="font-bold text-lg mb-3 text-gray-900 dark:text-white">
-                      {card.name}
-                    </h3>
-                    <div className="space-y-2">
-                      {card.details.map((detail, detailIndex) => (
-                        <div key={detailIndex} className="flex flex-col">
-                          {detail.property && (
-                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                              {detail.property}
-                            </span>
-                          )}
-                          <span className={detail.property ? "mt-1" : ""}>
-                            {detail.value}
-                          </span>
-                        </div>
-                      ))}
+              {/* Categories */}
+              <div className="space-y-8">
+                {categories.map((category, categoryIndex) => (
+                  <div key={categoryIndex} className="space-y-4">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {category.name}
+                    </h2>
+                    
+                    {/* Supplements grid - responsive layout */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {category.supplements.map((supplement, supplementIndex) => {
+                        const cardId = `${categoryIndex}-${supplementIndex}`;
+                        const isExpanded = expandedCards[cardId] || false;
+                        
+                        return (
+                          <div 
+                            key={supplementIndex}
+                            className={`bg-gray-50 dark:bg-slate-700 rounded-lg shadow-sm 
+                                        transition-all duration-300 hover:shadow-md
+                                        ${isExpanded ? 'scale-[1.02]' : ''}`}
+                          >
+                            <div 
+                              className="p-4 flex justify-between items-center cursor-pointer"
+                              onClick={() => toggleCard(cardId)}
+                            >
+                              <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                                {supplement.name}
+                              </h3>
+                              <div className="text-gray-500 dark:text-gray-400">
+                                {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                              </div>
+                            </div>
+                            
+                            <div className={`px-4 pb-4 ${isExpanded ? 'block' : 'hidden'}`}>
+                              <div className="space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3">
+                                {/* Properties */}
+                                {Object.entries(supplement.properties).map(([key, value], propIndex) => (
+                                  <div key={propIndex} className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                      {key}
+                                    </span>
+                                    <span className="mt-1">{value}</span>
+                                  </div>
+                                ))}
+                                
+                                {/* Details */}
+                                {supplement.details && (
+                                  <div className="mt-3 text-gray-700 dark:text-gray-300 text-sm">
+                                    {supplement.details}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
