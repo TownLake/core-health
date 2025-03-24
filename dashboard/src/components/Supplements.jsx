@@ -1,9 +1,9 @@
-// dashboard/src/components/Supplements.jsx
+// dashboard/src/components/Supplements.jsx (modified for persistent navigation)
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Pill, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useHealthData } from '../store/HealthDataContext';
 
-const Supplements = ({ navigateTo }) => {
+const Supplements = () => {
   const { theme } = useHealthData();
   const [markdownContent, setMarkdownContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -150,20 +150,10 @@ const Supplements = ({ navigateTo }) => {
     : parseMarkdownContent();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigateTo('/')}
-            className="p-2 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Pill className="w-6 h-6" />
-            {title}
-          </h1>
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+      <div className="p-6 pt-0">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">

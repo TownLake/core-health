@@ -1,19 +1,17 @@
 // dashboard/src/components/Dashboard.jsx
 import React from 'react';
-import { Moon, Heart, Scale, Activity, Hourglass, Sun, Sparkles, 
-         PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck,
-         Footprints, Wind, Timer, Pill } from 'lucide-react';
+import { Heart, Scale, Activity, Hourglass, Waves, Ruler, HeartPulse, ClipboardCheck,
+         Footprints, Wind, Timer, BedDouble, PlugZap } from 'lucide-react';
 import MetricCard from './MetricCard';
 import { useHealthData } from '../store/HealthDataContext';
 import { getTrendInfo, createSparklineData, hasValidData } from '../utils/dataUtils';
 import SocialLinks from './SocialLinks';
-import ThemeToggle from './ThemeToggle';
 import LoadingView from './LoadingView';
 import ErrorView from './ErrorView';
 import AIInsightsCard from './AIInsightsCard';
 import MetricSection from './MetricSection';
 
-const Dashboard = ({ navigateTo }) => {
+const Dashboard = ({ aiButtonInHeader = false }) => {
   const { 
     ouraData, 
     withingsData, 
@@ -22,9 +20,7 @@ const Dashboard = ({ navigateTo }) => {
     isLoading, 
     isAnalyzing,
     error,
-    theme,
-    getAIInsights,
-    toggleTheme 
+    getAIInsights
   } = useHealthData();
 
   if (isLoading) {
@@ -37,27 +33,9 @@ const Dashboard = ({ navigateTo }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={getAIInsights}
-              disabled={isAnalyzing}
-              aria-label="Get AI Health Insights"
-              className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors disabled:opacity-50 disabled:hover:bg-blue-500"
-            >
-              <Sparkles className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => navigateTo('/supplements')}
-              aria-label="View Supplements"
-              className="p-3 rounded-full bg-pink-400 hover:bg-pink-500 text-white transition-colors"
-            >
-              <Pill className="w-5 h-5" />
-            </button>
-            <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
-          </div>
+      <div className="p-6 pt-0">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Today's Metrics</h2>
         </div>
         
         {error && <ErrorView message={error} />}
@@ -122,7 +100,7 @@ const Dashboard = ({ navigateTo }) => {
 
           <MetricSection
             title="Sleep"
-            icon={Moon}
+            icon={BedDouble}
             metrics={[
               {
                 title: "Total Sleep",
