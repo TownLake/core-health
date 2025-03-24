@@ -4,7 +4,7 @@ import { Heart, Scale, Activity, Hourglass, Waves, Ruler, HeartPulse, ClipboardC
          Footprints, Wind, Timer, BedDouble, PlugZap } from 'lucide-react';
 import MetricCard from './MetricCard';
 import { useHealthData } from '../store/HealthDataContext';
-import { getTrendInfo, createSparklineData, hasValidData } from '../utils/dataUtils';
+import { getTrendInfo, createSparklineData, hasValidData, formatSecondsToMMSS } from '../utils/dataUtils';
 import SocialLinks from './SocialLinks';
 import LoadingView from './LoadingView';
 import ErrorView from './ErrorView';
@@ -156,13 +156,13 @@ const Dashboard = () => {
               },
               {
                 title: "5K Time",
-                value: runningData[0]?.five_k_minutes?.toFixed(1) ?? '--',
-                unit: "min",
-                ...getTrendInfo(runningData, 'five_k_minutes', '5k_time'),
-                sparklineData: createSparklineData(runningData, 'five_k_minutes'),
+                value: runningData[0]?.five_k_formatted ?? '--',
+                unit: "",
+                ...getTrendInfo(runningData, 'five_k_seconds', 'five_k_seconds'),
+                sparklineData: createSparklineData(runningData, 'five_k_seconds'),
                 icon: Timer,
                 fullData: runningData,
-                dataKey: "five_k_minutes"
+                dataKey: "five_k_seconds"
               }
             ]}
           />
