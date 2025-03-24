@@ -2,6 +2,89 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useHealthData } from '../store/HealthDataContext';
+import SocialLinks from './SocialLinks';
+
+const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
+  const dosage = supplement.properties.Dosage || '';
+  const icon = supplement.emoji;
+  
+  return (
+    <div 
+      className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
+      onClick={() => toggleCard(cardId)}
+    >
+      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
+        {icon && <span className="text-xl mr-2">{icon}</span>}
+        <span className="text-sm">{supplement.name}</span>
+      </div>
+      
+      <div className="flex justify-between items-end">
+        <div className="space-y-1">
+          <div className="text-4xl font-semibold text-gray-900 dark:text-white">
+            {dosage}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {supplement.properties.Source || ''}
+          </div>
+        </div>
+        
+        <div className="text-gray-500 dark:text-gray-400">
+          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+        </div>
+      </div>
+      
+      {/* Expanded details */}
+      {isExpanded && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          {Object.entries(supplement.properties)
+            .filter(([key]) => key !== 'Dosage' && key !== 'Source')
+            .map(([key, value], propIndex) => (
+              <div key={propIndex} className="mb-2">
+                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {key}:
+                </span>
+                <span className="ml-2 text-gray-700 dark:text-gray-300">{value}</span>
+              </div>
+            ))}
+          
+          {supplement.details && (
+            <div className="mt-2 text-gray-700 dark:text-gray-300 text-sm">
+              {supplement.details}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
+  return (
+    <div className="mb-8">
+      <div className="flex items-center mb-4">
+        {category.emoji && <span className="text-2xl mr-2">{category.emoji}</span>}
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{category.name}</h2>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {category.supplements.map((supplement, supplementIndex) => {
+          const cardId = `${categoryIndex}-${supplementIndex}`;
+          const isExpanded = expandedCards[cardId] || false;
+          
+          return (
+            <SupplementCard
+              key={supplementIndex}
+              supplement={supplement}
+              cardId={cardId}
+              isExpanded={isExpanded}
+              toggleCard={toggleCard}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const Supplements = () => {
   const { theme } = useHealthData();
@@ -36,7 +119,7 @@ const Supplements = () => {
     }));
   };
 
-  // Parse markdown content into structured data (function remains unchanged)
+  // Parse markdown content into structured data
   const parseMarkdownContent = () => {
     // Same parsing logic as before
     const lines = markdownContent.split('\n');
@@ -158,100 +241,34 @@ const Supplements = () => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-          ) : (
-            <div>
-              {/* Introduction section */}
-              {introduction && (
-                <div 
-                  className="prose dark:prose-invert max-w-none mb-8" 
-                  dangerouslySetInnerHTML={{ __html: introduction }} 
-                />
-              )}
-              
-              {/* Categories - all this content remains unchanged */}
-              <div className="space-y-8">
-                {categories.map((category, categoryIndex) => (
-                  <div key={categoryIndex} className="space-y-4">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      {category.emoji && <span className="text-2xl">{category.emoji}</span>}
-                      {category.name}
-                    </h2>
-                    
-                    {/* Supplements grid - responsive layout */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {category.supplements.map((supplement, supplementIndex) => {
-                        const cardId = `${categoryIndex}-${supplementIndex}`;
-                        const isExpanded = expandedCards[cardId] || false;
-                        const dosage = supplement.properties.Dosage || '';
-                        
-                        return (
-                          <div 
-                            key={supplementIndex}
-                            className={`bg-gray-50 dark:bg-slate-700 rounded-lg shadow-sm 
-                                        transition-all duration-300 hover:shadow-md
-                                        ${isExpanded ? 'scale-[1.02]' : ''}`}
-                          >
-                            <div 
-                              className="p-4 cursor-pointer"
-                              onClick={() => toggleCard(cardId)}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  {supplement.emoji && <span className="text-xl">{supplement.emoji}</span>}
-                                  <h3 className="font-bold text-lg text-gray-900 dark:text-white">
-                                    {supplement.name}
-                                  </h3>
-                                </div>
-                                <div className="text-gray-500 dark:text-gray-400">
-                                  {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                                </div>
-                              </div>
-                              
-                              {/* Dosage shown directly on the card */}
-                              {dosage && (
-                                <div className="mt-1 text-gray-600 dark:text-gray-300 font-medium">
-                                  {dosage}
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className={`px-4 pb-4 ${isExpanded ? 'block' : 'hidden'}`}>
-                              <div className="space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3">
-                                {/* Properties (excluding dosage) */}
-                                {Object.entries(supplement.properties)
-                                  .filter(([key]) => key !== 'Dosage')
-                                  .map(([key, value], propIndex) => (
-                                  <div key={propIndex} className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                      {key}
-                                    </span>
-                                    <span className="mt-1">{value}</span>
-                                  </div>
-                                ))}
-                                
-                                {/* Details */}
-                                {supplement.details && (
-                                  <div className="mt-3 text-gray-700 dark:text-gray-300 text-sm">
-                                    {supplement.details}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Introduction section if any */}
+        {introduction && (
+          <div 
+            className="prose dark:prose-invert max-w-none mb-8 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6" 
+            dangerouslySetInnerHTML={{ __html: introduction }} 
+          />
+        )}
+        
+        {/* Loading state */}
+        {isLoading ? (
+          <div className="flex justify-center items-center h-40 bg-white dark:bg-slate-800 rounded-xl shadow-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-8">
+            {categories.map((category, categoryIndex) => (
+              <SupplementSection
+                key={categoryIndex}
+                category={category}
+                categoryIndex={categoryIndex}
+                expandedCards={expandedCards}
+                toggleCard={toggleCard}
+              />
+            ))}
+          </div>
+        )}
+
+        <SocialLinks />
       </div>
     </div>
   );

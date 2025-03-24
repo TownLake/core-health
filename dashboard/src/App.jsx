@@ -76,7 +76,7 @@ function AppContent() {
             onClick={handleAIInsights}
             disabled={isAnalyzing}
             aria-label="Get AI Health Insights"
-            className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors shadow-lg disabled:opacity-50 disabled:hover:bg-blue-500"
+            className="p-3 rounded-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors shadow-lg disabled:opacity-50"
           >
             <Sparkles className="w-5 h-5" />
           </button>
