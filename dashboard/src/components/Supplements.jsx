@@ -61,9 +61,9 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
     <div>
-      <div className="flex items-center mb-4">
-        {category.emoji && <span className="text-2xl mr-2">{category.emoji}</span>}
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{category.name}</h2>
+      <div className="flex items-center text-gray-900 dark:text-white mb-4">
+        {category.emoji && <span className="mr-2">{category.emoji}</span>}
+        <h2 className="text-xl font-bold">{category.name}</h2>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 auto-rows-fr">
@@ -85,7 +85,6 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
       </div>
     </div>
   );
-};
 
 const Supplements = () => {
   const { theme } = useHealthData();
