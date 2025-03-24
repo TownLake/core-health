@@ -2,7 +2,7 @@
 import React from 'react';
 import { Moon, Heart, Scale, Activity, Hourglass, Sun, Sparkles, 
          PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck,
-         Footprints, Wind, Timer } from 'lucide-react';
+         Footprints, Wind, Timer, Pill } from 'lucide-react';
 import MetricCard from './MetricCard';
 import { useHealthData } from '../store/HealthDataContext';
 import { getTrendInfo, createSparklineData, hasValidData } from '../utils/dataUtils';
@@ -13,7 +13,7 @@ import ErrorView from './ErrorView';
 import AIInsightsCard from './AIInsightsCard';
 import MetricSection from './MetricSection';
 
-const Dashboard = () => {
+const Dashboard = ({ navigateTo }) => {
   const { 
     ouraData, 
     withingsData, 
@@ -48,6 +48,13 @@ const Dashboard = () => {
               className="p-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-colors disabled:opacity-50 disabled:hover:bg-blue-500"
             >
               <Sparkles className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => navigateTo('supplements')}
+              aria-label="View Supplements"
+              className="p-3 rounded-full bg-purple-400 hover:bg-purple-500 text-white transition-colors"
+              >
+              <Pill className="w-5 h-5" />
             </button>
             <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
           </div>
