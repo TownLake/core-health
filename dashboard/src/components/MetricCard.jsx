@@ -88,7 +88,7 @@ const DailyChart = memo(({ chartData, dataKey, unit, lineColor, minValue, maxVal
       <YAxis 
         stroke="#6B7280"
         domain={[minValue - padding, maxValue + padding]}
-        tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
+        tickFormatter={(value) => `${Math.round(value)}`}
         tick={{ fill: '#6B7280' }}
         tickLine={{ stroke: '#6B7280' }}
         axisLine={{ stroke: '#E5E7EB' }}
@@ -139,7 +139,7 @@ const MonthlyChart = memo(({ monthlyData, unit, minValue, maxValue, padding }) =
         <YAxis 
           stroke="#6B7280"
           domain={[minValue - padding, maxValue + padding]}
-          tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
+          tickFormatter={(value) => `${Math.round(value)}`}
           tick={{ fill: '#6B7280' }}
           tickLine={{ stroke: '#6B7280' }}
           axisLine={{ stroke: '#E5E7EB' }}
@@ -206,10 +206,11 @@ const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-slate-800 rounded-xl w-full max-w-4xl p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
             <Icon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{title}</h2>
+            <span className="text-sm text-gray-500 dark:text-gray-400">({unit})</span>
           </div>
           <div className="flex items-center gap-2">
             <button
