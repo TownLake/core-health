@@ -58,13 +58,48 @@ export async function onRequest(context) {
 
     console.log('Running data retrieved:', data.results.length, 'records');
     
-    // Add MM:SS formatted time to each record
-    const formattedData = data.results.map(record => {
-      if (record.five_k_seconds !== undefined && record.five_k_seconds !== null) {
+    // Process data to handle null values and add formatting
+    const formattedData = data.results;
+    
+    // Find the most recent non-null values for each metric
+    let lastValidFiveKSeconds = null;
+    let lastValidVo2Max = null;
+    
+    // First pass - find most recent non-null values
+    for (const record of formattedData) {
+      if (record.five_k_seconds !== null && record.five_k_seconds !== undefined) {
+        if (lastValidFiveKSeconds === null) {
+          lastValidFiveKSeconds = record.five_k_seconds;
+        }
+        // Add formatted time
         record.five_k_formatted = formatSecondsToMMSS(record.five_k_seconds);
       }
-      return record;
-    });
+      
+      if (record.vo2_max !== null && record.vo2_max !== undefined) {
+        if (lastValidVo2Max === null) {
+          lastValidVo2Max = record.vo2_max;
+        }
+      }
+    }
+    
+    // Second pass - fill in null values with most recent valid values
+    for (const record of formattedData) {
+      // Only update null records
+      if (record.five_k_seconds === null || record.five_k_seconds === undefined) {
+        if (lastValidFiveKSeconds !== null) {
+          record.five_k_seconds = lastValidFiveKSeconds;
+          record.five_k_formatted = formatSecondsToMMSS(lastValidFiveKSeconds);
+          record.is_fill_value_5k = true; // Flag to indicate this is a filled value
+        }
+      }
+      
+      if (record.vo2_max === null || record.vo2_max === undefined) {
+        if (lastValidVo2Max !== null) {
+          record.vo2_max = lastValidVo2Max;
+          record.is_fill_value_vo2 = true; // Flag to indicate this is a filled value
+        }
+      }
+    }
     
     const response = new Response(
       JSON.stringify(formattedData || []), 

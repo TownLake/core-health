@@ -2,11 +2,17 @@
 import React, { useState, memo, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar } from 'recharts';
 import { X, BarChart2, LineChart as LineChartIcon } from 'lucide-react';
-import { createMonthlyAverageData } from '../utils/dataUtils';
+import { createMonthlyAverageData, formatSecondsToMMSS } from '../utils/dataUtils';
 
 // Memoized tooltip components to prevent unnecessary re-renders
-const CustomTooltip = memo(({ active, payload, label, unit }) => {
+const CustomTooltip = memo(({ active, payload, label, unit, dataKey }) => {
   if (active && payload && payload.length) {
+    const isFilled = payload[0].payload[`is_fill_value_${dataKey.split('_')[0]}`];
+    const value = payload[0].value;
+    const displayValue = dataKey === 'five_k_seconds' ? 
+      formatSecondsToMMSS(value) : 
+      value.toFixed(1);
+    
     return (
       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
         <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
@@ -17,7 +23,12 @@ const CustomTooltip = memo(({ active, payload, label, unit }) => {
           })}
         </p>
         <p className="text-gray-900 dark:text-white font-semibold">
-          {payload[0].value.toFixed(1)}{unit}
+          {displayValue}{unit}
+          {isFilled && (
+            <span className="text-xs ml-1 text-gray-500 dark:text-gray-400">
+              (carried forward)
+            </span>
+          )}
         </p>
       </div>
     );
@@ -25,15 +36,20 @@ const CustomTooltip = memo(({ active, payload, label, unit }) => {
   return null;
 });
 
-const MonthlyTooltip = memo(({ active, payload, unit }) => {
+const MonthlyTooltip = memo(({ active, payload, unit, dataKey }) => {
   if (active && payload && payload.length) {
+    const value = payload[0].value;
+    const displayValue = dataKey === 'five_k_seconds' ? 
+      formatSecondsToMMSS(value) : 
+      value.toFixed(1);
+    
     return (
       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
         <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
           {payload[0].payload.monthName}
         </p>
         <p className="text-gray-900 dark:text-white font-semibold">
-          {payload[0].value.toFixed(1)}{unit} <span className="text-sm font-normal">(avg)</span>
+          {displayValue}{unit} <span className="text-sm font-normal">(avg)</span>
         </p>
         <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
           From {payload[0].payload.count} data points
@@ -44,12 +60,21 @@ const MonthlyTooltip = memo(({ active, payload, unit }) => {
   return null;
 });
 
-const SparklineTooltip = memo(({ active, payload }) => {
+const SparklineTooltip = memo(({ active, payload, dataKey }) => {
   if (active && payload && payload.length) {
+    const value = payload[0].value;
+    const isFilled = payload[0].payload.isFilled;
+    const displayValue = dataKey === 'five_k_seconds' ? 
+      formatSecondsToMMSS(value) : 
+      value.toFixed(1);
+    
     return (
       <div className="bg-white dark:bg-slate-800 px-2 py-1 rounded-md shadow-sm border border-slate-200 dark:border-slate-700">
         <p className="text-gray-900 dark:text-white text-sm font-medium">
-          {payload[0].value.toFixed(1)}
+          {displayValue}
+          {isFilled && (
+            <span className="text-xs ml-1 text-gray-500">*</span>
+          )}
         </p>
       </div>
     );
@@ -64,6 +89,10 @@ const DailyChart = memo(({ chartData, dataKey, unit, lineColor, minValue, maxVal
       <defs>
         <linearGradient id={`detailGradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="5%" stopColor={lineColor || "#3B82F6"} stopOpacity={0.3}/>
+          <stop offset="95%" stopColor={lineColor || "#3B82F6"} stopOpacity={0}/>
+        </linearGradient>
+        <linearGradient id={`detailGradientFilled-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor={lineColor || "#3B82F6"} stopOpacity={0.15}/>
           <stop offset="95%" stopColor={lineColor || "#3B82F6"} stopOpacity={0}/>
         </linearGradient>
       </defs>
@@ -88,13 +117,37 @@ const DailyChart = memo(({ chartData, dataKey, unit, lineColor, minValue, maxVal
       <YAxis 
         stroke="#6B7280"
         domain={[minValue - padding, maxValue + padding]}
-        tickFormatter={(value) => `${Math.round(value)}`}
+        tickFormatter={(value) => {
+          if (dataKey === 'five_k_seconds') {
+            return formatSecondsToMMSS(value);
+          }
+          return `${Math.round(value)}`;
+        }}
         tick={{ fill: '#6B7280' }}
         tickLine={{ stroke: '#6B7280' }}
         axisLine={{ stroke: '#E5E7EB' }}
         className="dark:opacity-50"
       />
-      <Tooltip content={<CustomTooltip unit={unit} />} />
+      <Tooltip content={<CustomTooltip unit={unit} dataKey={dataKey} />} />
+      {/* Create two separate areas - one for filled values and one for actual values */}
+      <Area
+        type="monotone"
+        dataKey={dataKey}
+        stroke="none"
+        strokeWidth={0}
+        fillOpacity={1}
+        fill={`url(#detailGradientFilled-${dataKey})`}
+        dot={false}
+        activeDot={false}
+        name="filledData"
+        connectNulls={false}
+        isAnimationActive={false}
+        // Only show points that are filled
+        data={chartData.map(point => ({
+          ...point,
+          [dataKey]: point[`is_fill_value_${dataKey.split('_')[0]}`] ? point[dataKey] : null
+        }))}
+      />
       <Area
         type="monotone"
         dataKey={dataKey}
@@ -109,13 +162,19 @@ const DailyChart = memo(({ chartData, dataKey, unit, lineColor, minValue, maxVal
           strokeWidth: 2,
           fill: '#FFFFFF'
         }}
+        connectNulls={false}
+        // Only show points that are not filled
+        data={chartData.map(point => ({
+          ...point,
+          [dataKey]: point[`is_fill_value_${dataKey.split('_')[0]}`] ? null : point[dataKey]
+        }))}
       />
     </AreaChart>
   </ResponsiveContainer>
 ));
 
 // Separate monthly chart component
-const MonthlyChart = memo(({ monthlyData, unit, minValue, maxValue, padding }) => {
+const MonthlyChart = memo(({ monthlyData, unit, minValue, maxValue, padding, dataKey }) => {
   // Use a neutral color for all monthly bars regardless of trend
   const neutralBarColor = "#4B5563"; // A neutral gray that works in both light/dark mode
   
@@ -139,13 +198,18 @@ const MonthlyChart = memo(({ monthlyData, unit, minValue, maxValue, padding }) =
         <YAxis 
           stroke="#6B7280"
           domain={[minValue - padding, maxValue + padding]}
-          tickFormatter={(value) => `${Math.round(value)}`}
+          tickFormatter={(value) => {
+            if (dataKey === 'five_k_seconds') {
+              return formatSecondsToMMSS(value);
+            }
+            return `${Math.round(value)}`;
+          }}
           tick={{ fill: '#6B7280' }}
           tickLine={{ stroke: '#6B7280' }}
           axisLine={{ stroke: '#E5E7EB' }}
           className="dark:opacity-50"
         />
-        <Tooltip content={<MonthlyTooltip unit={unit} />} />
+        <Tooltip content={<MonthlyTooltip unit={unit} dataKey={dataKey} />} />
         <Bar 
           dataKey="average" 
           fill={neutralBarColor} 
@@ -171,7 +235,9 @@ const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, 
   
   // Memoized monthly data calculation
   const monthlyData = useMemo(() => {
-    return createMonthlyAverageData(data, dataKey);
+    // For monthly data, only use non-filled values for the averaging
+    const filteredData = data.filter(item => !item[`is_fill_value_${dataKey.split('_')[0]}`]);
+    return createMonthlyAverageData(filteredData, dataKey);
   }, [data, dataKey]);
 
   // Memoized min/max calculations for daily view
@@ -252,6 +318,7 @@ const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, 
               minValue={monthlyChartValues.minValue}
               maxValue={monthlyChartValues.maxValue}
               padding={monthlyChartValues.padding}
+              dataKey={dataKey}
             />
           )}
         </div>
@@ -278,6 +345,21 @@ const MetricCard = memo(({
   // Generate unique gradientId for each metric
   const gradientId = useMemo(() => `sparkline-${dataKey}-gradient`, [dataKey]);
 
+  // Process sparkline data to include isFilled flag
+  const processedSparklineData = useMemo(() => {
+    if (!sparklineData) return [];
+    
+    return sparklineData.map((item, index) => {
+      const isFilled = fullData && 
+                       fullData[fullData.length - 1 - index] && 
+                       fullData[fullData.length - 1 - index][`is_fill_value_${dataKey.split('_')[0]}`];
+      return {
+        ...item,
+        isFilled
+      };
+    });
+  }, [sparklineData, fullData, dataKey]);
+
   return (
     <>
       <div 
@@ -300,10 +382,10 @@ const MetricCard = memo(({
             </div>
           </div>
           
-          {sparklineData && sparklineData.length > 0 && (
+          {processedSparklineData && processedSparklineData.length > 0 && (
             <div className="w-32 h-16">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={sparklineData}>
+                <AreaChart data={processedSparklineData}>
                   <defs>
                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={lineColor} stopOpacity={0.3}/>
@@ -311,7 +393,7 @@ const MetricCard = memo(({
                     </linearGradient>
                   </defs>
                   <Tooltip 
-                    content={<SparklineTooltip />}
+                    content={<SparklineTooltip dataKey={dataKey} />}
                     cursor={{ stroke: lineColor, strokeWidth: 1 }}
                   />
                   <Area
@@ -321,7 +403,21 @@ const MetricCard = memo(({
                     strokeWidth={2}
                     fillOpacity={1}
                     fill={`url(#${gradientId})`}
-                    dot={false}
+                    dot={(props) => {
+                      // Add a small dot just for filled values
+                      if (props.payload.isFilled) {
+                        return (
+                          <circle
+                            cx={props.cx}
+                            cy={props.cy}
+                            r={2}
+                            fill={lineColor}
+                            fillOpacity={0.5}
+                          />
+                        );
+                      }
+                      return null; // No dots for normal values
+                    }}
                     isAnimationActive={false} // Disable animation for better performance
                   />
                 </AreaChart>
