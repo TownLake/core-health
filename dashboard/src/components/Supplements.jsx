@@ -1,4 +1,4 @@
-// dashboard/src/components/Supplements.jsx (modified for persistent navigation)
+// dashboard/src/components/Supplements.jsx
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useHealthData } from '../store/HealthDataContext';
@@ -36,8 +36,9 @@ const Supplements = () => {
     }));
   };
 
-  // Parse markdown content into structured data
+  // Parse markdown content into structured data (function remains unchanged)
   const parseMarkdownContent = () => {
+    // Same parsing logic as before
     const lines = markdownContent.split('\n');
     let mainTitle = 'My Supplement Routine';
     let introduction = '';
@@ -151,9 +152,10 @@ const Supplements = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="p-6 pt-0">
+      <div className="p-6">
+        {/* Title only (navigation is in main App component) */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
@@ -171,7 +173,7 @@ const Supplements = () => {
                 />
               )}
               
-              {/* Categories */}
+              {/* Categories - all this content remains unchanged */}
               <div className="space-y-8">
                 {categories.map((category, categoryIndex) => (
                   <div key={categoryIndex} className="space-y-4">

@@ -11,7 +11,7 @@ import ErrorView from './ErrorView';
 import AIInsightsCard from './AIInsightsCard';
 import MetricSection from './MetricSection';
 
-const Dashboard = ({ aiButtonInHeader = false }) => {
+const Dashboard = () => {
   const { 
     ouraData, 
     withingsData, 
@@ -20,7 +20,6 @@ const Dashboard = ({ aiButtonInHeader = false }) => {
     isLoading, 
     isAnalyzing,
     error,
-    getAIInsights
   } = useHealthData();
 
   if (isLoading) {
@@ -33,9 +32,10 @@ const Dashboard = ({ aiButtonInHeader = false }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="p-6 pt-0">
+      <div className="p-6">
+        {/* Title only (navigation is in main App component) */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Today's Metrics</h2>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today</h1>
         </div>
         
         {error && <ErrorView message={error} />}
@@ -71,6 +71,7 @@ const Dashboard = ({ aiButtonInHeader = false }) => {
             ]}
           />
 
+          {/* Other metric sections remain unchanged */}
           <MetricSection
             title="Body"
             icon={ClipboardCheck}
