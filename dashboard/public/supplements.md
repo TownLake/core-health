@@ -1,6 +1,8 @@
-# My Supplement Routine
+# Supplement Routine
 
-I take these supplements daily to support my health and performance goals.
+I am not sure if any of these work. I think they probably do, at least some of them, given the research but I am not someone who believes this is a magic fix. That said, I am writing it down.
+
+_The detail fields are LLM-sourced_
 
 ## 🛡️ Antioxidant & Immune Support
 
@@ -12,7 +14,7 @@ I take these supplements daily to support my health and performance goals.
 ### 🌱 Ginger
 - **Dosage**: 500mg
 - **Source**: Capsule from Celeiro
-- **Details**: Powerful anti-inflammatory and antioxidant that helps with digestion and may reduce muscle pain and soreness.
+- **Details**: Anti-inflammatory and antioxidant that helps with digestion and may reduce muscle pain and soreness.
 
 ### 🌶️ Curcumin
 - **Dosage**: 250mg
@@ -22,7 +24,7 @@ I take these supplements daily to support my health and performance goals.
 ### 🧄 Garlic
 - **Dosage**: 1000mg
 - **Source**: Capsule from Celeiro
-- **Details**: Contains compounds with potent medicinal properties, boosts immune function and reduces risk of cardiovascular issues.
+- **Details**: Boosts immune function and reduces risk of cardiovascular issues.
 
 ## 🦴 Joint & Structural Health
 

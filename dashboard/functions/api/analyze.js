@@ -107,4 +107,85 @@ export async function onRequest(context) {
   }
 }
 
-// Helper function to compute a simple checksum for
+// Helper function to compute a simple checksum for caching
+async function computeChecksum(str) {
+  const msgUint8 = new TextEncoder().encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+}
+
+// Helper function to build the AI prompt
+function buildAIPrompt(ouraData, withingsData, runningData) {
+  const calculateTrendSummary = (ouraData, withingsData, runningData) => {
+    const getAverage = (data, key, startIdx, count) => {
+      const values = data.slice(startIdx, startIdx + count)
+                          .map(d => d[key])
+                          .filter(v => v !== null && v !== undefined);
+      return values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : null;
+    };
+  
+    const metrics = [
+      { data: ouraData, key: 'average_hrv', name: 'HRV' },
+      { data: ouraData, key: 'resting_heart_rate', name: 'RHR' },
+      { data: ouraData, key: 'total_sleep', name: 'Sleep Duration' },
+      { data: ouraData, key: 'delay', name: 'Sleep Delay' },
+      { data: withingsData, key: 'weight', name: 'Weight' },
+      { data: withingsData, key: 'fat_ratio', name: 'Body Fat' }
+    ];
+
+    // Add running metrics if available
+    if (runningData && runningData.length > 0) {
+      metrics.push(
+        { data: runningData, key: 'vo2_max', name: 'VO2 Max' },
+        { data: runningData, key: 'five_k_minutes', name: '5K Time' }
+      );
+    }
+  
+    return metrics.map(({ data, key, name }) => {
+      if (!data || data.length < 3) return `${name}: insufficient data`;
+      
+      const recentAvg = getAverage(data, key, 0, 3);
+      const previousAvg = getAverage(data, key, 3, 7);
+      
+      if (recentAvg === null || previousAvg === null) {
+        return `${name}: insufficient data`;
+      }
+      
+      const diff = recentAvg - previousAvg;
+      const percentChange = (diff / previousAvg) * 100;
+      
+      return `${name}: ${percentChange > 0 ? 'up' : 'down'} ${Math.abs(percentChange).toFixed(1)}%`;
+    }).join('\n');
+  };
+
+  return `You are a health insights assistant. Analyze the following health data for a 34 year old male.
+
+  Your output should consist of the following sections:
+
+  ## Vitals
+  * Compare the results of HRV, Resting Heart Rate, Weight, Body Fat to known standards for a 34 year old male. For example, "A RHR of XX is excellent for a person your age."
+  * Use emojis as bullet points. Pick an emoji tailored to the point.
+
+  ## Trends
+  * Call out any trends worthy of note.
+  * Use emojis as bullet points. Pick an emoji tailored to the point.
+
+  ## Summary
+  * 1-2 sentence summary.
+
+Latest metrics:
+- HRV: ${ouraData[0].average_hrv}ms
+- Resting Heart Rate: ${ouraData[0].resting_heart_rate}bpm
+- Sleep Duration: ${ouraData[0].total_sleep}h
+- Sleep Delay: ${ouraData[0].delay}min
+- Weight: ${withingsData[0].weight}lbs
+- Body Fat: ${withingsData[0].fat_ratio}%
+${runningData && runningData.length > 0 ? `- VO2 Max: ${runningData[0].vo2_max}ml/kg/min
+- 5K Time: ${runningData[0].five_k_minutes}min` : ''}
+
+Recent trends (comparing 3-day vs previous 7-day averages):
+${calculateTrendSummary(ouraData, withingsData, runningData)}
+
+Be direct and specific in your recommendations.`;
+}
