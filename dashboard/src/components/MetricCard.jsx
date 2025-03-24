@@ -115,46 +115,51 @@ const DailyChart = memo(({ chartData, dataKey, unit, lineColor, minValue, maxVal
 ));
 
 // Separate monthly chart component
-const MonthlyChart = memo(({ monthlyData, unit, lineColor, minValue, maxValue, padding }) => (
-  <ResponsiveContainer width="100%" height="100%">
-    <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
-      <CartesianGrid 
-        strokeDasharray="3 3" 
-        vertical={false}
-        stroke="#E5E7EB"
-        className="dark:opacity-20"
-      />
-      <XAxis 
-        dataKey="monthName" 
-        stroke="#6B7280"
-        tick={{ fill: '#6B7280' }}
-        tickLine={{ stroke: '#6B7280' }}
-        axisLine={{ stroke: '#E5E7EB' }}
-        className="dark:opacity-50"
-      />
-      <YAxis 
-        stroke="#6B7280"
-        domain={[minValue - padding, maxValue + padding]}
-        tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
-        tick={{ fill: '#6B7280' }}
-        tickLine={{ stroke: '#6B7280' }}
-        axisLine={{ stroke: '#E5E7EB' }}
-        className="dark:opacity-50"
-      />
-      <Tooltip content={<MonthlyTooltip unit={unit} />} />
-      <Bar 
-        dataKey="average" 
-        fill={lineColor || "#3B82F6"} 
-        radius={[4, 4, 0, 0]}
-        maxBarSize={50}
-      />
-    </BarChart>
-  </ResponsiveContainer>
-));
+const MonthlyChart = memo(({ monthlyData, unit, minValue, maxValue, padding }) => {
+  // Use a neutral color for all monthly bars regardless of trend
+  const neutralBarColor = "#4B5563"; // A neutral gray that works in both light/dark mode
+  
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+        <CartesianGrid 
+          strokeDasharray="3 3" 
+          vertical={false}
+          stroke="#E5E7EB"
+          className="dark:opacity-20"
+        />
+        <XAxis 
+          dataKey="monthName" 
+          stroke="#6B7280"
+          tick={{ fill: '#6B7280' }}
+          tickLine={{ stroke: '#6B7280' }}
+          axisLine={{ stroke: '#E5E7EB' }}
+          className="dark:opacity-50"
+        />
+        <YAxis 
+          stroke="#6B7280"
+          domain={[minValue - padding, maxValue + padding]}
+          tickFormatter={(value) => `${value.toFixed(1)}${unit}`}
+          tick={{ fill: '#6B7280' }}
+          tickLine={{ stroke: '#6B7280' }}
+          axisLine={{ stroke: '#E5E7EB' }}
+          className="dark:opacity-50"
+        />
+        <Tooltip content={<MonthlyTooltip unit={unit} />} />
+        <Bar 
+          dataKey="average" 
+          fill={neutralBarColor} 
+          radius={[4, 4, 0, 0]}
+          maxBarSize={50}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+});
 
 // Modal component for detailed chart view
 const DetailedChartModal = memo(({ isOpen, onClose, title, data, dataKey, unit, icon: Icon, lineColor }) => {
-  const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'monthly'
+  const [viewMode, setViewMode] = useState('monthly'); // Default to monthly view
   
   if (!isOpen) return null;
 
