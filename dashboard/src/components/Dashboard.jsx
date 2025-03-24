@@ -52,8 +52,8 @@ const Dashboard = ({ navigateTo }) => {
             <button
               onClick={() => navigateTo('supplements')}
               aria-label="View Supplements"
-              className="p-3 rounded-full bg-green-500 hover:bg-green-600 text-white transition-colors"
-            >
+              className="p-3 rounded-full bg-purple-400 hover:bg-purple-500 text-white transition-colors"
+              >
               <Pill className="w-5 h-5" />
             </button>
             <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
