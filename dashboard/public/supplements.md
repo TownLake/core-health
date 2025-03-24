@@ -1,5 +1,7 @@
 # Supplements
 
+Sample text about sample table.
+
 | Supplement | Dosage | Timing |
 |------------|--------|--------|
 | Vitamin D3 | 5000 IU | Morning with breakfast |
