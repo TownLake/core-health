@@ -11,50 +11,54 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   
   return (
     <div 
-      className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col h-full"
+      className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] h-full"
       onClick={() => toggleCard(cardId)}
     >
-      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
-        {icon && <span className="text-xl mr-2">{icon}</span>}
-        <span className="text-sm">{source}</span>
-      </div>
-      
-      <div className="flex justify-between items-end mt-auto">
-        <div className="space-y-1">
-          <div className="text-4xl font-semibold text-gray-900 dark:text-white">
-            {supplement.name}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {dosage}
-          </div>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
+          {icon && <span className="text-xl mr-2">{icon}</span>}
+          <span className="text-sm">{source}</span>
         </div>
         
-        <div className="text-gray-500 dark:text-gray-400">
-          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </div>
-      </div>
-      
-      {/* Expanded details */}
-      {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-          {Object.entries(supplement.properties)
-            .filter(([key]) => key !== 'Dosage' && key !== 'Source')
-            .map(([key, value], propIndex) => (
-              <div key={propIndex} className="mb-1 text-sm">
-                <span className="font-medium text-gray-500 dark:text-gray-400">
-                  {key}:
-                </span>
-                <span className="ml-1 text-gray-700 dark:text-gray-300">{value}</span>
+        <div className="flex-grow flex flex-col justify-between">
+          <div className="flex justify-between">
+            <div className="space-y-1">
+              <div className="text-4xl font-semibold text-gray-900 dark:text-white">
+                {supplement.name}
               </div>
-            ))}
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {dosage}
+              </div>
+            </div>
+            
+            <div className="text-gray-500 dark:text-gray-400">
+              {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </div>
+          </div>
           
-          {supplement.details && (
-            <div className="mt-1 text-gray-700 dark:text-gray-300 text-sm">
-              {supplement.details}
+          {/* Expanded details */}
+          {isExpanded && (
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+              {Object.entries(supplement.properties)
+                .filter(([key]) => key !== 'Dosage' && key !== 'Source')
+                .map(([key, value], propIndex) => (
+                  <div key={propIndex} className="mb-1 text-sm">
+                    <span className="font-medium text-gray-500 dark:text-gray-400">
+                      {key}:
+                    </span>
+                    <span className="ml-1 text-gray-700 dark:text-gray-300">{value}</span>
+                  </div>
+                ))}
+              
+              {supplement.details && (
+                <div className="mt-1 text-gray-700 dark:text-gray-300 text-sm">
+                  {supplement.details}
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -73,13 +77,13 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
         </h2>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {category.supplements.map((supplement, supplementIndex) => {
           const cardId = `${categoryIndex}-${supplementIndex}`;
           const isExpanded = expandedCards[cardId] || false;
           
           return (
-            <div key={supplementIndex} className={isExpanded ? 'row-span-2' : ''}>
+            <div key={supplementIndex}>
               <SupplementCard
                 supplement={supplement}
                 cardId={cardId}
