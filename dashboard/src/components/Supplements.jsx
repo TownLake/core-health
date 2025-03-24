@@ -69,9 +69,13 @@ const Supplements = ({ navigateTo }) => {
           categories.push(currentCategory);
         }
         
-        // Start new category
+        // Start new category and extract emoji if present
+        const categoryName = line.substring(3).trim();
+        const emojiMatch = categoryName.match(/^([\u{1F300}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}])\s+(.*)/u);
+        
         currentCategory = {
-          name: line.substring(3).trim(),
+          name: emojiMatch ? emojiMatch[2] : categoryName,
+          emoji: emojiMatch ? emojiMatch[1] : '',
           supplements: []
         };
         
@@ -86,9 +90,13 @@ const Supplements = ({ navigateTo }) => {
           currentCategory.supplements.push(currentSupplement);
         }
         
-        // Start new supplement
+        // Start new supplement and extract emoji if present
+        const supplementName = line.substring(4).trim();
+        const emojiMatch = supplementName.match(/^([\u{1F300}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}])\s+(.*)/u);
+        
         currentSupplement = {
-          name: line.substring(4).trim(),
+          name: emojiMatch ? emojiMatch[2] : supplementName,
+          emoji: emojiMatch ? emojiMatch[1] : '',
           properties: {},
           details: ''
         };
@@ -177,7 +185,8 @@ const Supplements = ({ navigateTo }) => {
               <div className="space-y-8">
                 {categories.map((category, categoryIndex) => (
                   <div key={categoryIndex} className="space-y-4">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      {category.emoji && <span className="text-2xl">{category.emoji}</span>}
                       {category.name}
                     </h2>
                     
@@ -186,6 +195,7 @@ const Supplements = ({ navigateTo }) => {
                       {category.supplements.map((supplement, supplementIndex) => {
                         const cardId = `${categoryIndex}-${supplementIndex}`;
                         const isExpanded = expandedCards[cardId] || false;
+                        const dosage = supplement.properties.Dosage || '';
                         
                         return (
                           <div 
@@ -195,21 +205,35 @@ const Supplements = ({ navigateTo }) => {
                                         ${isExpanded ? 'scale-[1.02]' : ''}`}
                           >
                             <div 
-                              className="p-4 flex justify-between items-center cursor-pointer"
+                              className="p-4 cursor-pointer"
                               onClick={() => toggleCard(cardId)}
                             >
-                              <h3 className="font-bold text-lg text-gray-900 dark:text-white">
-                                {supplement.name}
-                              </h3>
-                              <div className="text-gray-500 dark:text-gray-400">
-                                {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  {supplement.emoji && <span className="text-xl">{supplement.emoji}</span>}
+                                  <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                                    {supplement.name}
+                                  </h3>
+                                </div>
+                                <div className="text-gray-500 dark:text-gray-400">
+                                  {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                </div>
                               </div>
+                              
+                              {/* Dosage shown directly on the card */}
+                              {dosage && (
+                                <div className="mt-1 text-gray-600 dark:text-gray-300 font-medium">
+                                  {dosage}
+                                </div>
+                              )}
                             </div>
                             
                             <div className={`px-4 pb-4 ${isExpanded ? 'block' : 'hidden'}`}>
                               <div className="space-y-2 border-t border-gray-200 dark:border-gray-600 pt-3">
-                                {/* Properties */}
-                                {Object.entries(supplement.properties).map(([key, value], propIndex) => (
+                                {/* Properties (excluding dosage) */}
+                                {Object.entries(supplement.properties)
+                                  .filter(([key]) => key !== 'Dosage')
+                                  .map(([key, value], propIndex) => (
                                   <div key={propIndex} className="flex flex-col">
                                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                                       {key}
