@@ -13,14 +13,14 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
       className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col h-full"
       onClick={() => toggleCard(cardId)}
     >
-      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-2">
+      <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
         {icon && <span className="text-xl mr-2">{icon}</span>}
         <span className="text-sm">{supplement.name}</span>
       </div>
       
       <div className="flex justify-between items-end mt-auto">
-        <div>
-          <div className="text-4xl font-semibold text-gray-900 dark:text-white truncate max-w-[150px]">
+        <div className="space-y-1">
+          <div className="text-4xl font-semibold text-gray-900 dark:text-white">
             {dosage}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -58,13 +58,18 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   );
 };
 
-// Updated SupplementSection component
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
     <div>
-      <div className="flex items-center text-gray-900 dark:text-white mb-4">
-        {category.emoji && <span className="mr-2">{category.emoji}</span>}
-        <h2 className="text-xl font-bold">{category.name}</h2>
+      <div className="flex items-center mb-4">
+        {category.emoji && (
+          <span className="text-2xl text-gray-700 dark:text-gray-300 mr-2">
+            {category.emoji}
+          </span>
+        )}
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+          {category.name}
+        </h2>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 auto-rows-fr">
@@ -123,7 +128,6 @@ const Supplements = () => {
 
   // Parse markdown content into structured data
   const parseMarkdownContent = () => {
-    // Same parsing logic as before
     const lines = markdownContent.split('\n');
     let mainTitle = 'My Supplement Routine';
     let introduction = '';
