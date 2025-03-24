@@ -1,6 +1,5 @@
 // dashboard/src/components/Dashboard.jsx
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { Moon, Heart, Scale, Activity, Hourglass, Sun, Sparkles, 
          PlugZap, BedDouble, Waves, Ruler, HeartPulse, ClipboardCheck,
          Footprints, Wind, Timer, Pill } from 'lucide-react';
@@ -14,7 +13,7 @@ import ErrorView from './ErrorView';
 import AIInsightsCard from './AIInsightsCard';
 import MetricSection from './MetricSection';
 
-const Dashboard = () => {
+const Dashboard = ({ navigateTo }) => {
   const { 
     ouraData, 
     withingsData, 
@@ -50,13 +49,13 @@ const Dashboard = () => {
             >
               <Sparkles className="w-5 h-5" />
             </button>
-            <Link
-              to="/supplements"
+            <button
+              onClick={() => navigateTo('supplements')}
               aria-label="View Supplements"
               className="p-3 rounded-full bg-green-500 hover:bg-green-600 text-white transition-colors"
             >
               <Pill className="w-5 h-5" />
-            </Link>
+            </button>
             <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
           </div>
         </div>
