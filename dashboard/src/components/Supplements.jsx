@@ -6,7 +6,7 @@ import SocialLinks from './SocialLinks';
 
 const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   const dosage = supplement.properties.Dosage || '';
-  const source = supplement.properties.Source ? supplement.properties.Source.split(' ')[0] : '';
+  const source = supplement.properties.Source || '';
   const icon = supplement.emoji;
   
   return (
@@ -16,14 +16,14 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
     >
       <div className="flex flex-col h-full">
         <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
-          {icon && <span className="text-xl mr-2">{icon}</span>}
           <span className="text-sm">{source}</span>
         </div>
         
         <div className="flex-grow flex flex-col justify-between">
           <div className="flex justify-between">
             <div className="space-y-1">
-              <div className="text-4xl font-semibold text-gray-900 dark:text-white">
+              <div className="text-4xl font-semibold text-gray-900 dark:text-white flex items-center">
+                {icon && <span className="text-xl mr-2">{icon}</span>}
                 {supplement.name}
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -211,11 +211,12 @@ const Supplements = () => {
             const property = parts[0].replace(/\*\*/g, '').trim();
             const value = parts.slice(1).join(':').trim();
             
-            currentSupplement.properties[property] = value;
+            if (property === 'Details') {
+              currentSupplement.details = value;
+            } else {
+              currentSupplement.properties[property] = value;
+            }
           }
-        } else if (content.includes('**Details**:')) {
-          // Extract details after "Details:" prefix
-          currentSupplement.details = content.replace('**Details**:', '').trim();
         }
         
         continue;
