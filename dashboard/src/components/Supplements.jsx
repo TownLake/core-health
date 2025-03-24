@@ -35,18 +35,59 @@ const Supplements = ({ navigateTo }) => {
     fetchMarkdown();
   }, []);
 
-  // Parse markdown table into HTML
-  const renderMarkdownTable = () => {
-    // Basic markdown table parser
+  // Parse markdown content into HTML
+  const renderMarkdownContent = () => {
+    // Basic markdown parser
     const lines = markdownContent.split('\n').filter(line => line.trim());
     
-    // Extract title
-    const title = lines[0].startsWith('# ') ? lines[0].substring(2) : 'Supplements';
+    // Extract title (first h1)
+    const titleIndex = lines.findIndex(line => line.startsWith('# '));
+    const title = titleIndex !== -1 ? lines[titleIndex].substring(2) : 'Supplements';
     
     // Find table lines
     const tableStartIndex = lines.findIndex(line => line.includes('|---'));
-    if (tableStartIndex === -1) return { title, table: '<p>No table data found</p>' };
     
+    // If there's no table, just render text content
+    if (tableStartIndex === -1) {
+      const textContent = lines.map(line => {
+        // Handle headers
+        if (line.startsWith('# ')) {
+          return `<h1 class="text-2xl font-bold mb-4">${line.substring(2)}</h1>`;
+        }
+        if (line.startsWith('## ')) {
+          return `<h2 class="text-xl font-bold mb-3">${line.substring(3)}</h2>`;
+        }
+        if (line.startsWith('### ')) {
+          return `<h3 class="text-lg font-bold mb-2">${line.substring(4)}</h3>`;
+        }
+        
+        // Handle paragraphs
+        return `<p class="mb-4">${line}</p>`;
+      }).join('');
+      
+      return { title, content: textContent, table: '' };
+    }
+    
+    // Extract any content before the table
+    const contentBeforeTable = lines.slice(0, tableStartIndex)
+      .filter(line => !line.startsWith('# ') || line !== lines[titleIndex])
+      .map(line => {
+        // Handle headers (except the title)
+        if (line.startsWith('# ') && line !== lines[titleIndex]) {
+          return `<h1 class="text-2xl font-bold mb-4">${line.substring(2)}</h1>`;
+        }
+        if (line.startsWith('## ')) {
+          return `<h2 class="text-xl font-bold mb-3">${line.substring(3)}</h2>`;
+        }
+        if (line.startsWith('### ')) {
+          return `<h3 class="text-lg font-bold mb-2">${line.substring(4)}</h3>`;
+        }
+        
+        // Handle paragraphs
+        return `<p class="mb-4">${line}</p>`;
+      }).join('');
+    
+    // Process the table
     const headerRow = lines[tableStartIndex - 1];
     const headerCells = headerRow.split('|').filter(cell => cell.trim()).map(cell => cell.trim());
     
@@ -62,7 +103,7 @@ const Supplements = ({ navigateTo }) => {
       }).join('');
     
     const table = `
-      <table class="w-full border-collapse">
+      <table class="w-full border-collapse mt-6">
         <thead>
           <tr class="bg-gray-100 dark:bg-slate-700 border-b border-gray-200 dark:border-gray-700">
             ${headerCells.map(cell => `<th class="py-3 px-4 text-left">${cell}</th>`).join('')}
@@ -74,10 +115,12 @@ const Supplements = ({ navigateTo }) => {
       </table>
     `;
     
-    return { title, table };
+    return { title, content: contentBeforeTable, table };
   };
 
-  const { title, table } = isLoading ? { title: 'Supplements', table: '' } : renderMarkdownTable();
+  const { title, content, table } = isLoading 
+    ? { title: 'Supplements', content: '', table: '' } 
+    : renderMarkdownContent();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-6">
@@ -103,7 +146,8 @@ const Supplements = ({ navigateTo }) => {
             </div>
           ) : (
             <div className="prose dark:prose-invert max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: table }} />
+              {content && <div dangerouslySetInnerHTML={{ __html: content }} />}
+              {table && <div dangerouslySetInnerHTML={{ __html: table }} />}
             </div>
           )}
         </div>

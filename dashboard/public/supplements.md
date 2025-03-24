@@ -1,8 +1,10 @@
-# Supplements
+# My Supplement Routine
 
-Sample text about sample table.
+Loerm Ipsum
 
-| Supplement | Dosage | Timing |
+## Daily Supplement Schedule
+
+| Supplement | Dosage | Goal |
 |------------|--------|--------|
 | Vitamin D3 | 5000 IU | Morning with breakfast |
 | Magnesium | 400mg | Evening with dinner |
