@@ -250,7 +250,7 @@ const Supplements = () => {
         {/* Introduction section if any */}
         {introduction && (
           <div 
-            className="prose dark:prose-invert max-w-none mb-8 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6" 
+            className="prose dark:prose-invert max-w-none mb-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6" 
             dangerouslySetInnerHTML={{ __html: introduction }} 
           />
         )}

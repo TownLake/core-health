@@ -38,7 +38,7 @@ const Dashboard = () => {
         {aiResponse && !isAnalyzing && <AIInsightsCard response={aiResponse} />}
         {isAnalyzing && <AIInsightsCard isLoading={true} />}
         
-        <div className="grid grid-cols-1 gap-8">
+        <div className="grid grid-cols-1 gap-6 mt-2">
           <MetricSection
             title="Heart"
             icon={Heart}

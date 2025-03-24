@@ -71,8 +71,8 @@ function AppContent() {
         {/* Page Content with Suspense for loading state */}
         <div className="pt-16 sm:pt-6 px-4">
           {/* Page Title - Now moved above the navigation on small screens */}
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-16 sm:mb-0 mt-2">
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-0 mt-2">
               {currentPath === '/supplements' ? 'My Supplement Routine' : 'Today'}
             </h1>
             
