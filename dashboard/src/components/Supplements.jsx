@@ -1,30 +1,37 @@
 // dashboard/src/components/Supplements.jsx
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useHealthData } from '../store/HealthDataContext';
 import SocialLinks from './SocialLinks';
 
 const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   const dosage = supplement.properties.Dosage || '';
   const icon = supplement.emoji;
+  const source = supplement.properties.Source || '';
   
   return (
     <div 
       className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col h-full"
       onClick={() => toggleCard(cardId)}
     >
+      {/* Source at top (like icon + title in MetricCard) */}
       <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
         {icon && <span className="text-xl mr-2">{icon}</span>}
-        <span className="text-sm">{supplement.name}</span>
+        <span className="text-sm">{source ? source.split(' ')[0] : ''}</span>
       </div>
       
+      {/* Main content */}
       <div className="flex justify-between items-end mt-auto">
         <div className="space-y-1">
+          {/* Dosage as main value (like in MetricCard) */}
           <div className="text-4xl font-semibold text-gray-900 dark:text-white">
-            {dosage}
+            {dosage.replace(/(\d+)([a-zA-Z]+)/, '$1')}
+            <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">
+              {dosage.replace(/(\d+)([a-zA-Z]+)/, '$2')}
+            </span>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {supplement.properties.Source ? supplement.properties.Source.split(' ')[0] : ''}
+          {/* Supplement name as subtitle (like trend in MetricCard) */}
+          <div className="text-sm text-blue-500">
+            {supplement.name}
           </div>
         </div>
         
@@ -33,9 +40,9 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
         </div>
       </div>
       
-      {/* Expanded details */}
+      {/* Expanded details - position absolute to prevent layout shift */}
       {isExpanded && (
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="absolute left-0 right-0 bg-white dark:bg-slate-800 rounded-b-2xl shadow-lg p-6 mt-2 z-10 border-t border-gray-200 dark:border-gray-700" style={{ top: '100%' }}>
           {Object.entries(supplement.properties)
             .filter(([key]) => key !== 'Dosage' && key !== 'Source')
             .map(([key, value], propIndex) => (
@@ -61,24 +68,24 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
     <div>
-      <div className="flex items-center mb-4">
+      <div className="flex items-center gap-2 mb-4">
         {category.emoji && (
-          <span className="text-2xl text-gray-700 dark:text-gray-300 mr-2">
+          <span className="text-2xl text-gray-900 dark:text-white">
             {category.emoji}
           </span>
         )}
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           {category.name}
         </h2>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 auto-rows-fr">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {category.supplements.map((supplement, supplementIndex) => {
           const cardId = `${categoryIndex}-${supplementIndex}`;
           const isExpanded = expandedCards[cardId] || false;
           
           return (
-            <div key={supplementIndex} className={isExpanded ? 'row-span-2' : ''}>
+            <div key={supplementIndex} className="relative">
               <SupplementCard
                 supplement={supplement}
                 cardId={cardId}
@@ -94,7 +101,6 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
 };
 
 const Supplements = () => {
-  const { theme } = useHealthData();
   const [markdownContent, setMarkdownContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState({});
