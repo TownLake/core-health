@@ -58,6 +58,7 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   );
 };
 
+// Updated SupplementSection component
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
     <div>
@@ -85,6 +86,7 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
       </div>
     </div>
   );
+};
 
 const Supplements = () => {
   const { theme } = useHealthData();
