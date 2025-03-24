@@ -20,13 +20,7 @@ const Supplements = ({ navigateTo }) => {
       } catch (error) {
         console.error('Error loading supplements data:', error);
         // Fallback content in case file can't be loaded
-        setMarkdownContent(`# Supplements
-
-| Supplement | Dosage | Timing |
-|------------|--------|--------|
-| Vitamin D3 | 5000 IU | Morning with breakfast |
-| Magnesium | 400mg | Evening with dinner |
-| Omega-3 | 1000mg | Morning with breakfast |`);
+        setMarkdownContent(`# Supplements\n\nNo supplement data available.`);
       } finally {
         setIsLoading(false);
       }
@@ -38,84 +32,104 @@ const Supplements = ({ navigateTo }) => {
   // Parse markdown content into HTML
   const renderMarkdownContent = () => {
     // Basic markdown parser
-    const lines = markdownContent.split('\n').filter(line => line.trim());
+    const lines = markdownContent.split('\n');
+    let htmlContent = '';
+    let tableHtml = '';
+    let title = 'Supplements';
     
-    // Extract title (first h1)
-    const titleIndex = lines.findIndex(line => line.startsWith('# '));
-    const title = titleIndex !== -1 ? lines[titleIndex].substring(2) : 'Supplements';
-    
-    // Find table lines
-    const tableStartIndex = lines.findIndex(line => line.includes('|---'));
-    
-    // If there's no table, just render text content
-    if (tableStartIndex === -1) {
-      const textContent = lines.map(line => {
-        // Handle headers
-        if (line.startsWith('# ')) {
-          return `<h1 class="text-2xl font-bold mb-4">${line.substring(2)}</h1>`;
-        }
-        if (line.startsWith('## ')) {
-          return `<h2 class="text-xl font-bold mb-3">${line.substring(3)}</h2>`;
-        }
-        if (line.startsWith('### ')) {
-          return `<h3 class="text-lg font-bold mb-2">${line.substring(4)}</h3>`;
-        }
-        
-        // Handle paragraphs
-        return `<p class="mb-4">${line}</p>`;
-      }).join('');
-      
-      return { title, content: textContent, table: '' };
+    // Find the first h1 title
+    const titleLine = lines.find(line => line.trim().startsWith('# '));
+    if (titleLine) {
+      title = titleLine.substring(2).trim();
     }
     
-    // Extract any content before the table
-    const contentBeforeTable = lines.slice(0, tableStartIndex)
-      .filter(line => !line.startsWith('# ') || line !== lines[titleIndex])
-      .map(line => {
-        // Handle headers (except the title)
-        if (line.startsWith('# ') && line !== lines[titleIndex]) {
-          return `<h1 class="text-2xl font-bold mb-4">${line.substring(2)}</h1>`;
-        }
-        if (line.startsWith('## ')) {
-          return `<h2 class="text-xl font-bold mb-3">${line.substring(3)}</h2>`;
-        }
-        if (line.startsWith('### ')) {
-          return `<h3 class="text-lg font-bold mb-2">${line.substring(4)}</h3>`;
+    // Process line by line
+    let i = 0;
+    let inTable = false;
+    let tableHeaders = [];
+    let tableRows = [];
+    
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      
+      // Skip empty lines
+      if (!line) {
+        i++;
+        continue;
+      }
+      
+      // Detect table start - look for a line with multiple pipe characters
+      if (!inTable && line.includes('|') && !line.startsWith('# ') && !line.startsWith('## ')) {
+        inTable = true;
+        
+        // Extract headers
+        tableHeaders = line.split('|')
+          .map(cell => cell.trim())
+          .filter(cell => cell);
+        
+        // Skip the separator line
+        i += 2;
+        continue;
+      }
+      
+      // Process table rows
+      if (inTable && line.includes('|')) {
+        const cells = line.split('|')
+          .map(cell => cell.trim())
+          .filter(cell => cell);
+        
+        if (cells.length > 0) {
+          tableRows.push(cells);
         }
         
-        // Handle paragraphs
-        return `<p class="mb-4">${line}</p>`;
-      }).join('');
+        i++;
+        continue;
+      }
+      
+      // End of table detection
+      if (inTable && !line.includes('|')) {
+        inTable = false;
+      }
+      
+      // Handle headers
+      if (line.startsWith('# ') && !line.startsWith('## ') && line !== titleLine) {
+        htmlContent += `<h1 class="text-2xl font-bold mt-6 mb-4">${line.substring(2)}</h1>`;
+      } else if (line.startsWith('## ')) {
+        htmlContent += `<h2 class="text-xl font-bold mt-5 mb-3">${line.substring(3)}</h2>`;
+      } else if (line.startsWith('### ')) {
+        htmlContent += `<h3 class="text-lg font-bold mt-4 mb-2">${line.substring(4)}</h3>`;
+      } 
+      // Handle paragraphs (not headers, not in table)
+      else if (!line.startsWith('# ') && !inTable && !line.includes('|---')) {
+        htmlContent += `<p class="mb-4">${line}</p>`;
+      }
+      
+      i++;
+    }
     
-    // Process the table
-    const headerRow = lines[tableStartIndex - 1];
-    const headerCells = headerRow.split('|').filter(cell => cell.trim()).map(cell => cell.trim());
+    // Generate table HTML if we have headers and rows
+    if (tableHeaders.length > 0 && tableRows.length > 0) {
+      tableHtml = `
+        <table class="w-full border-collapse mt-4">
+          <thead>
+            <tr class="bg-gray-100 dark:bg-slate-700 border-b border-gray-200 dark:border-gray-700">
+              ${tableHeaders.map(header => 
+                `<th class="py-3 px-4 text-left font-medium">${header}</th>`
+              ).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows.map(row => `
+              <tr class="border-b border-gray-200 dark:border-gray-700">
+                ${row.map(cell => `<td class="py-3 px-4">${cell}</td>`).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
     
-    const tableRows = lines.slice(tableStartIndex + 1)
-      .filter(line => line.includes('|'))
-      .map(line => {
-        const cells = line.split('|').filter(cell => cell.trim()).map(cell => cell.trim());
-        return `
-          <tr class="border-b border-gray-200 dark:border-gray-700">
-            ${cells.map(cell => `<td class="py-3 px-4">${cell}</td>`).join('')}
-          </tr>
-        `;
-      }).join('');
-    
-    const table = `
-      <table class="w-full border-collapse mt-6">
-        <thead>
-          <tr class="bg-gray-100 dark:bg-slate-700 border-b border-gray-200 dark:border-gray-700">
-            ${headerCells.map(cell => `<th class="py-3 px-4 text-left">${cell}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    `;
-    
-    return { title, content: contentBeforeTable, table };
+    return { title, content: htmlContent, table: tableHtml };
   };
 
   const { title, content, table } = isLoading 
