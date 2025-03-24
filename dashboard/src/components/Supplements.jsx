@@ -1,13 +1,21 @@
 // dashboard/src/components/Supplements.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+// No need for HealthDataContext
 import SocialLinks from './SocialLinks';
 
-const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
+// Memoize card to prevent unnecessary re-renders
+const SupplementCard = memo(({ supplement, cardId, isExpanded, toggleCard }) => {
   const dosage = supplement.properties.Dosage || '';
   const icon = supplement.emoji;
   const source = supplement.properties.Source || '';
   
+  // Extract dosage parts once
+  const dosageParts = useMemo(() => {
+    const match = dosage.match(/^(\d+\.?\d*)([a-zA-Z]+)/);
+    return match ? [match[1], match[2]] : [dosage, ''];
+  }, [dosage]);
+
   return (
     <div 
       className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col h-full"
@@ -24,9 +32,9 @@ const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
         <div className="space-y-1">
           {/* Dosage as main value (like in MetricCard) */}
           <div className="text-4xl font-semibold text-gray-900 dark:text-white">
-            {dosage.replace(/(\d+)([a-zA-Z]+)/, '$1')}
+            {dosageParts[0]}
             <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">
-              {dosage.replace(/(\d+)([a-zA-Z]+)/, '$2')}
+              {dosageParts[1]}
             </span>
           </div>
           {/* Supplement name as subtitle (like trend in MetricCard) */}
@@ -98,7 +106,9 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
       </div>
     </div>
   );
-};
+});
+
+SupplementSection.displayName = 'SupplementSection';
 
 const Supplements = () => {
   const [markdownContent, setMarkdownContent] = useState('');
@@ -125,12 +135,13 @@ const Supplements = () => {
     fetchMarkdown();
   }, []);
 
-  const toggleCard = (cardId) => {
+  // Memoize toggle handler to prevent recreation on each render
+  const toggleCard = useMemo(() => (cardId) => {
     setExpandedCards(prev => ({
       ...prev,
       [cardId]: !prev[cardId]
     }));
-  };
+  }, []);
 
   // Parse markdown content into structured data
   const parseMarkdownContent = () => {
@@ -241,9 +252,12 @@ const Supplements = () => {
     return { title: mainTitle, introduction, categories };
   };
 
-  const { title, introduction, categories } = isLoading 
-    ? { title: 'My Supplement Routine', introduction: '', categories: [] } 
-    : parseMarkdownContent();
+  // Memoize the parsed content to prevent recalculation on each render
+  const { title, introduction, categories } = useMemo(() => {
+    return isLoading 
+      ? { title: 'My Supplement Routine', introduction: '', categories: [] } 
+      : parseMarkdownContent();
+  }, [isLoading, markdownContent]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
