@@ -1,8 +1,4 @@
-# Supplement Routine
-
-I am not sure if any of these work. I think they probably do, at least some of them, given the research but I am not someone who believes this is a magic fix. That said, I am writing it down.
-
-_The detail fields are LLM-sourced_
+# Supplements
 
 ## 🛡️ Antioxidant & Immune Support
 
