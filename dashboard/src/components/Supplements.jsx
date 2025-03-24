@@ -1,45 +1,30 @@
 // dashboard/src/components/Supplements.jsx
-import React, { useState, useEffect, memo, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-// No need for HealthDataContext
+import { useHealthData } from '../store/HealthDataContext';
 import SocialLinks from './SocialLinks';
 
-// Memoize card to prevent unnecessary re-renders
-const SupplementCard = memo(({ supplement, cardId, isExpanded, toggleCard }) => {
+const SupplementCard = ({ supplement, cardId, isExpanded, toggleCard }) => {
   const dosage = supplement.properties.Dosage || '';
   const icon = supplement.emoji;
-  const source = supplement.properties.Source || '';
   
-  // Extract dosage parts once
-  const dosageParts = useMemo(() => {
-    const match = dosage.match(/^(\d+\.?\d*)([a-zA-Z]+)/);
-    return match ? [match[1], match[2]] : [dosage, ''];
-  }, [dosage]);
-
   return (
     <div 
       className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] flex flex-col h-full"
       onClick={() => toggleCard(cardId)}
     >
-      {/* Source at top (like icon + title in MetricCard) */}
       <div className="flex items-center text-gray-500 dark:text-gray-400 mb-4">
         {icon && <span className="text-xl mr-2">{icon}</span>}
-        <span className="text-sm">{source ? source.split(' ')[0] : ''}</span>
+        <span className="text-sm">{supplement.name}</span>
       </div>
       
-      {/* Main content */}
       <div className="flex justify-between items-end mt-auto">
         <div className="space-y-1">
-          {/* Dosage as main value (like in MetricCard) */}
           <div className="text-4xl font-semibold text-gray-900 dark:text-white">
-            {dosageParts[0]}
-            <span className="text-gray-400 dark:text-gray-500 text-2xl ml-1">
-              {dosageParts[1]}
-            </span>
+            {dosage}
           </div>
-          {/* Supplement name as subtitle (like trend in MetricCard) */}
-          <div className="text-sm text-blue-500">
-            {supplement.name}
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {supplement.properties.Source ? supplement.properties.Source.split(' ')[0] : ''}
           </div>
         </div>
         
@@ -48,9 +33,9 @@ const SupplementCard = memo(({ supplement, cardId, isExpanded, toggleCard }) => 
         </div>
       </div>
       
-      {/* Expanded details - position absolute to prevent layout shift */}
+      {/* Expanded details */}
       {isExpanded && (
-        <div className="absolute left-0 right-0 bg-white dark:bg-slate-800 rounded-b-2xl shadow-lg p-6 mt-2 z-10 border-t border-gray-200 dark:border-gray-700" style={{ top: '100%' }}>
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           {Object.entries(supplement.properties)
             .filter(([key]) => key !== 'Dosage' && key !== 'Source')
             .map(([key, value], propIndex) => (
@@ -76,24 +61,24 @@ const SupplementCard = memo(({ supplement, cardId, isExpanded, toggleCard }) => 
 const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard }) => {
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center mb-4">
         {category.emoji && (
-          <span className="text-2xl text-gray-900 dark:text-white">
+          <span className="text-2xl text-gray-700 dark:text-gray-300 mr-2">
             {category.emoji}
           </span>
         )}
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
           {category.name}
         </h2>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 auto-rows-fr">
         {category.supplements.map((supplement, supplementIndex) => {
           const cardId = `${categoryIndex}-${supplementIndex}`;
           const isExpanded = expandedCards[cardId] || false;
           
           return (
-            <div key={supplementIndex} className="relative">
+            <div key={supplementIndex} className={isExpanded ? 'row-span-2' : ''}>
               <SupplementCard
                 supplement={supplement}
                 cardId={cardId}
@@ -106,11 +91,10 @@ const SupplementSection = ({ category, categoryIndex, expandedCards, toggleCard 
       </div>
     </div>
   );
-});
-
-SupplementSection.displayName = 'SupplementSection';
+};
 
 const Supplements = () => {
+  const { theme } = useHealthData();
   const [markdownContent, setMarkdownContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState({});
@@ -135,13 +119,12 @@ const Supplements = () => {
     fetchMarkdown();
   }, []);
 
-  // Memoize toggle handler to prevent recreation on each render
-  const toggleCard = useMemo(() => (cardId) => {
+  const toggleCard = (cardId) => {
     setExpandedCards(prev => ({
       ...prev,
       [cardId]: !prev[cardId]
     }));
-  }, []);
+  };
 
   // Parse markdown content into structured data
   const parseMarkdownContent = () => {
@@ -252,12 +235,9 @@ const Supplements = () => {
     return { title: mainTitle, introduction, categories };
   };
 
-  // Memoize the parsed content to prevent recalculation on each render
-  const { title, introduction, categories } = useMemo(() => {
-    return isLoading 
-      ? { title: 'My Supplement Routine', introduction: '', categories: [] } 
-      : parseMarkdownContent();
-  }, [isLoading, markdownContent]);
+  const { title, introduction, categories } = isLoading 
+    ? { title: 'My Supplement Routine', introduction: '', categories: [] } 
+    : parseMarkdownContent();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
