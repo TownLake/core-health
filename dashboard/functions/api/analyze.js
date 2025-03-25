@@ -167,6 +167,9 @@ function buildAIPrompt(ouraData, withingsData, runningData) {
   * Compare the results of HRV, Resting Heart Rate, Weight, Body Fat to known standards for a 34 year old male. For example, "A RHR of XX is excellent for a person your age."
   * Use emojis as bullet points. Pick an emoji tailored to the point.
 
+  ## Activity
+  * Compare the running pace and VO2 max to known athletic standards for a 34 year old male.
+
   ## Trends
   * Call out any trends worthy of note.
   * Use emojis as bullet points. Pick an emoji tailored to the point.
