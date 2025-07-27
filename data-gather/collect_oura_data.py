@@ -1,54 +1,10 @@
-import os
-import requests
-from datetime import datetime, timedelta
-import json
-from typing import Dict, Any
-
-class CloudflareD1:
-    def __init__(self, account_id: str, database_id: str, bearer_token: str):
-        self.account_id = account_id
-        self.database_id = database_id
-        self.base_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query"
-        self.headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {bearer_token}"
-        }
-
-    def insert_oura_data(self, data: Dict[str, Any]) -> Dict:
-        query = """
-        INSERT INTO oura_data (
-            date, collected_at, deep_sleep_minutes,
-            sleep_score, bedtime_start_date, bedtime_start_time,
-            resting_heart_rate, average_hrv, total_sleep, spo2_avg,
-            efficiency, delay, total_calories
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """
-        
-        params = [
-            data.get("date"),
-            data.get("collected_at"),
-            data.get("deep_sleep_minutes"),
-            data.get("sleep_score"),
-            data.get("bedtime_start_date"),
-            data.get("bedtime_start_time"),
-            data.get("resting_heart_rate"),
-            data.get("average_hrv"),
-            data.get("total_sleep"),
-            data.get("spo2_avg"),
-            data.get("efficiency"),
-            data.get("delay"),
-            data.get("total_calories")
-        ]
-
-        payload = {"sql": query, "params": params}
-        response = requests.post(self.base_url, headers=self.headers, json=payload)
-        response.raise_for_status()
-        return response.json()
-
-
 def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     headers = {'Authorization': f'Bearer {token}'}
-    previous_date = (datetime.fromisoformat(target_date).date() - timedelta(days=1)).isoformat()
+    # Convert the target date string to a date object for easy calculations
+    target_date_obj = datetime.fromisoformat(target_date).date()
+    
+    # This is used for the /sleep endpoint, which is fine as-is
+    previous_date = (target_date_obj - timedelta(days=1)).isoformat()
     
     data = {
         'date': target_date,
@@ -66,6 +22,8 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         'total_calories': None
     }
     
+    # --- The following blocks for sleep and spo2 are unchanged ---
+
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_sleep',
@@ -104,20 +62,35 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
-    # Fetch total calories for the SAME day as our sleep data
+    # ----------------- FIXED ACTIVITY BLOCK -----------------
+    # This is the section that has been fixed.
     try:
+        # 1. Define a wider date range to avoid timezone issues.
+        start_range = (target_date_obj - timedelta(days=1)).isoformat()
+        end_range = (target_date_obj + timedelta(days=1)).isoformat()
+        
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_activity',
             headers=headers,
-            params={'start_date': target_date, 'end_date': target_date}
+            # 2. Query the API with the wider date range.
+            params={'start_date': start_range, 'end_date': end_range}
         )
         response.raise_for_status()
         activity_data = response.json().get('data', [])
+        
         if activity_data:
-            data['total_calories'] = int(activity_data[0].get('total_calories', 0))
+            # 3. Find the specific day's data from the results list.
+            # The 'next' function with a generator is an efficient way to find the first match.
+            target_day_data = next((item for item in activity_data if item.get('day') == target_date), None)
+            
+            if target_day_data:
+                # 4. Extract calories from the correct day's data object.
+                data['total_calories'] = int(target_day_data.get('total_calories', 0))
+                
     except Exception as e:
         print(f"Error fetching daily activity data: {e}")
-
+    # ----------------- END OF FIXED BLOCK -----------------
+        
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_spo2',
@@ -132,37 +105,3 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         print(f"Error fetching SPO2 data: {e}")
     
     return data
-
-
-def main():
-    account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
-    database_id = os.getenv('CLOUDFLARE_D1_DB')
-    bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
-    oura_token = os.getenv('OURA_TOKEN')
-    
-    if not all([account_id, database_id, bearer_token, oura_token]):
-        missing = [var for var, val in {
-            'CLOUDFLARE_ACCOUNT_ID': account_id,
-            'CLOUDFLARE_D1_DB': database_id,
-            'CLOUDFLARE_API_TOKEN': bearer_token,
-            'OURA_TOKEN': oura_token
-        }.items() if not val]
-        raise ValueError(f"Missing environment variables: {', '.join(missing)}")
-
-    target_date = os.getenv('TARGET_DATE') or datetime.now().strftime('%Y-%m-%d')
-
-    oura_data = fetch_oura_data(oura_token, target_date)
-    print("Fetched Oura data:")
-    print(json.dumps(oura_data, indent=2))
-
-    d1_client = CloudflareD1(account_id, database_id, bearer_token)
-    try:
-        result = d1_client.insert_oura_data(oura_data)
-        print("D1 insert result:")
-        print(json.dumps(result, indent=2))
-    except Exception as e:
-        print(f"Error inserting data into D1: {e}")
-        # raise e
-
-if __name__ == "__main__":
-    main()
