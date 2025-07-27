@@ -5,6 +5,9 @@ import json
 from typing import Dict, Any
 
 class CloudflareD1:
+    """
+    A client for interacting with the Cloudflare D1 database API.
+    """
     def __init__(self, account_id: str, database_id: str, bearer_token: str):
         self.account_id = account_id
         self.database_id = database_id
@@ -15,6 +18,9 @@ class CloudflareD1:
         }
 
     def insert_oura_data(self, data: Dict[str, Any]) -> Dict:
+        """
+        Inserts a dictionary of Oura data into the 'oura_data' table.
+        """
         query = """
         INSERT INTO oura_data (
             date, collected_at, deep_sleep_minutes,
@@ -47,8 +53,15 @@ class CloudflareD1:
 
 
 def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
+    """
+    Fetches various Oura Ring data points for a given target date.
+    """
     headers = {'Authorization': f'Bearer {token}'}
-    previous_date = (datetime.fromisoformat(target_date).date() - timedelta(days=1)).isoformat()
+    # Convert the target date string to a date object for easy calculations
+    target_date_obj = datetime.fromisoformat(target_date).date()
+    
+    # This is used for the /sleep endpoint, which is fine as-is
+    previous_date = (target_date_obj - timedelta(days=1)).isoformat()
     
     data = {
         'date': target_date,
@@ -104,20 +117,33 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
-    # Fetch total calories for the SAME day as our sleep data
+    # --- FIXED ACTIVITY BLOCK ---
     try:
+        # 1. Define a wider date range to avoid timezone issues.
+        start_range = (target_date_obj - timedelta(days=1)).isoformat()
+        end_range = (target_date_obj + timedelta(days=1)).isoformat()
+        
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_activity',
             headers=headers,
-            params={'start_date': target_date, 'end_date': target_date}
+            # 2. Query the API with the wider date range.
+            params={'start_date': start_range, 'end_date': end_range}
         )
         response.raise_for_status()
         activity_data = response.json().get('data', [])
+        
         if activity_data:
-            data['total_calories'] = int(activity_data[0].get('total_calories', 0))
+            # 3. Find the specific day's data from the results list.
+            target_day_data = next((item for item in activity_data if item.get('day') == target_date), None)
+            
+            if target_day_data:
+                # 4. Extract calories from the correct day's data object.
+                data['total_calories'] = int(target_day_data.get('total_calories', 0))
+                
     except Exception as e:
         print(f"Error fetching daily activity data: {e}")
-
+    # --- END OF FIXED BLOCK ---
+        
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_spo2',
@@ -135,6 +161,9 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
 
 
 def main():
+    """
+    Main execution function.
+    """
     account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
     database_id = os.getenv('CLOUDFLARE_D1_DB')
     bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
@@ -149,6 +178,7 @@ def main():
         }.items() if not val]
         raise ValueError(f"Missing environment variables: {', '.join(missing)}")
 
+    # Use TARGET_DATE from environment if set, otherwise default to today's date
     target_date = os.getenv('TARGET_DATE') or datetime.now().strftime('%Y-%m-%d')
 
     oura_data = fetch_oura_data(oura_token, target_date)
@@ -162,6 +192,7 @@ def main():
         print(json.dumps(result, indent=2))
     except Exception as e:
         print(f"Error inserting data into D1: {e}")
+        # Uncomment the line below to stop execution on D1 insert error
         # raise e
 
 if __name__ == "__main__":
