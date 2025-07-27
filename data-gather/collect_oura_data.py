@@ -24,7 +24,6 @@ class CloudflareD1:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
-        # Using .get() for safer dictionary access
         params = [
             data.get("date"),
             data.get("collected_at"),
@@ -38,7 +37,7 @@ class CloudflareD1:
             data.get("spo2_avg"),
             data.get("efficiency"),
             data.get("delay"),
-            data.get("total_calories") # New value
+            data.get("total_calories")
         ]
 
         payload = {"sql": query, "params": params}
@@ -46,12 +45,11 @@ class CloudflareD1:
         response.raise_for_status()
         return response.json()
 
+
 def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     headers = {'Authorization': f'Bearer {token}'}
-    # This date represents the concluded day for which we want activity data.
     previous_date = (datetime.fromisoformat(target_date).date() - timedelta(days=1)).isoformat()
     
-    # Pre-initialize all keys to ensure they exist for the database insert.
     data = {
         'date': target_date,
         'collected_at': datetime.now().isoformat(),
@@ -65,7 +63,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         'efficiency': None,
         'delay': None,
         'spo2_avg': None,
-        'total_calories': None # New field
+        'total_calories': None
     }
     
     try:
@@ -90,12 +88,9 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         response.raise_for_status()
         sleep_data = response.json().get('data', [])
         if sleep_data:
-            target_sessions = [
-                s for s in sleep_data 
-                if s.get('bedtime_end', '').startswith(target_date)
-            ]
-            if target_sessions:
-                session = target_sessions[0]
+            sessions = [s for s in sleep_data if s.get('bedtime_end', '').startswith(target_date)]
+            if sessions:
+                session = sessions[0]
                 data['deep_sleep_minutes'] = int(session.get('deep_sleep_duration', 0) / 60)
                 if session.get('bedtime_start'):
                     dt = datetime.fromisoformat(session['bedtime_start'].replace('Z', '+00:00'))
@@ -109,17 +104,17 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
     
-    # Fetch total calories from the PREVIOUS day's activity
+    # Fetch total calories for the SAME day as our sleep data
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_activity',
             headers=headers,
-            params={'start_date': previous_date, 'end_date': previous_date}
+            params={'start_date': target_date, 'end_date': target_date}
         )
         response.raise_for_status()
         activity_data = response.json().get('data', [])
         if activity_data:
-            data['total_calories'] = activity_data[0].get('total_calories')
+            data['total_calories'] = int(activity_data[0].get('total_calories', 0))
     except Exception as e:
         print(f"Error fetching daily activity data: {e}")
 
@@ -137,6 +132,7 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         print(f"Error fetching SPO2 data: {e}")
     
     return data
+
 
 def main():
     account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
@@ -166,7 +162,6 @@ def main():
         print(json.dumps(result, indent=2))
     except Exception as e:
         print(f"Error inserting data into D1: {e}")
-        # Optionally, re-raise the exception to fail the GitHub Action
         # raise e
 
 if __name__ == "__main__":
