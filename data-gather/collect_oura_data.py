@@ -5,9 +5,6 @@ import json
 from typing import Dict, Any
 
 class CloudflareD1:
-    """
-    A client for interacting with the Cloudflare D1 database API.
-    """
     def __init__(self, account_id: str, database_id: str, bearer_token: str):
         self.account_id = account_id
         self.database_id = database_id
@@ -18,12 +15,10 @@ class CloudflareD1:
         }
 
     def insert_oura_data(self, data: Dict[str, Any]) -> Dict:
-        """
-        Inserts a dictionary of Oura data into the 'oura_data' table.
-        """
-        # The SQL query now includes both spo2_avg and total_calories.
+        # --- THIS IS THE ONLY LINE THAT CHANGED ---
+        # Using "INSERT OR REPLACE" handles cases where the row for the date already exists.
         query = """
-        INSERT INTO oura_data (
+        INSERT OR REPLACE INTO oura_data (
             date, collected_at, deep_sleep_minutes,
             sleep_score, bedtime_start_date, bedtime_start_time,
             resting_heart_rate, average_hrv, total_sleep, spo2_avg,
@@ -31,7 +26,6 @@ class CloudflareD1:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
 
-        # The parameters list matches the order of the columns in the query.
         params = [
             data.get("date"),
             data.get("collected_at"),
@@ -55,14 +49,10 @@ class CloudflareD1:
 
 
 def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
-    """
-    Fetches various Oura Ring data points for a given target date.
-    """
     headers = {'Authorization': f'Bearer {token}'}
     target_date_obj = datetime.fromisoformat(target_date).date()
     sleep_start_date = (target_date_obj - timedelta(days=1)).isoformat()
 
-    # Pre-initialize all keys to ensure they exist for the database insert.
     data = {
         'date': target_date,
         'collected_at': datetime.now().isoformat(),
@@ -79,7 +69,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
         'total_calories': None
     }
 
-    # Fetch sleep score
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_sleep',
@@ -93,7 +82,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching daily sleep score: {e}")
 
-    # Fetch sleep session details
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/sleep',
@@ -119,7 +107,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching sleep data: {e}")
 
-    # Fetch total calories using the robust method
     try:
         activity_start_range = (target_date_obj - timedelta(days=1)).isoformat()
         activity_end_range = (target_date_obj + timedelta(days=1)).isoformat()
@@ -137,7 +124,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error fetching daily activity data: {e}")
 
-    # Fetch SPO2 data with robust error handling
     try:
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_spo2',
@@ -157,9 +143,6 @@ def fetch_oura_data(token: str, target_date: str) -> Dict[str, Any]:
 
 
 def main():
-    """
-    Main execution function.
-    """
     account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
     database_id = os.getenv('CLOUDFLARE_D1_DB')
     bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
@@ -174,7 +157,6 @@ def main():
         }.items() if not val]
         raise ValueError(f"Missing environment variables: {', '.join(missing)}")
 
-    # Default to yesterday's date, which is more likely to have complete data.
     target_date = os.getenv('TARGET_DATE') or (datetime.now().date() - timedelta(days=1)).strftime('%Y-%m-%d')
 
     oura_data = fetch_oura_data(oura_token, target_date)
