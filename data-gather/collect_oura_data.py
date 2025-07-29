@@ -29,7 +29,6 @@ def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
         print(f"Error fetching daily sleep score: {e}")
 
     # --- 2. Get Detailed Sleep Session Data ---
-    # Fetch sleep sessions that started yesterday and ended today.
     try:
         session_start_date = (datetime.fromisoformat(sleep_date).date() - timedelta(days=1)).isoformat()
         response = requests.get(
@@ -39,15 +38,15 @@ def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
         )
         response.raise_for_status()
         sleep_data = response.json().get('data', [])
-        # Find the specific session that ended on the sleep_date
         main_session = next((s for s in sleep_data if s.get('day') == sleep_date), None)
         if main_session:
+            # --- SCHEMA FIXES ARE HERE ---
             data['deep_sleep_minutes'] = int(main_session.get('deep_sleep_duration', 0) / 60)
+            data['total_sleep'] = main_session.get('total_sleep_duration', 0) / 3600 # Changed key to match schema
+            data['delay'] = int(main_session.get('latency', 0) / 60) # Changed key to match schema
             data['resting_heart_rate'] = main_session.get('lowest_heart_rate')
             data['average_hrv'] = main_session.get('average_hrv')
-            data['total_sleep_hours'] = main_session.get('total_sleep_duration', 0) / 3600
             data['efficiency'] = main_session.get('efficiency')
-            data['latency_minutes'] = int(main_session.get('latency', 0) / 60)
             if main_session.get('bedtime_start'):
                 dt = datetime.fromisoformat(main_session['bedtime_start'].replace('Z', '+00:00'))
                 data['bedtime_start_date'] = dt.date().isoformat()
@@ -74,27 +73,37 @@ def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
 
 def fetch_activity_data(token: str, activity_date: str) -> Dict[str, Any]:
     """
-    Fetches activity-related data for a specific day.
+    Fetches activity-related data for a specific day using the more robust multi-day fetch.
     """
     headers = {'Authorization': f'Bearer {token}'}
     data = {}
 
     try:
+        # --- ACTIVITY FIX: Using your original, more robust logic ---
+        # Fetch a 3-day window to ensure the data for the target day is available.
+        activity_date_obj = datetime.fromisoformat(activity_date).date()
+        start_range = (activity_date_obj - timedelta(days=1)).isoformat()
+        end_range = (activity_date_obj + timedelta(days=1)).isoformat()
+        
         response = requests.get(
             'https://api.ouraring.com/v2/usercollection/daily_activity',
             headers=headers,
-            params={'start_date': activity_date, 'end_date': activity_date}
+            params={'start_date': start_range, 'end_date': end_range}
         )
         response.raise_for_status()
         activity_data = response.json().get('data', [])
-        if activity_data:
-            data['total_calories'] = activity_data[0].get('total_calories')
+        
+        # Find the specific day's data within the response
+        target_day_data = next((item for item in activity_data if item.get('day') == activity_date), None)
+        
+        if target_day_data:
+            data['total_calories'] = target_day_data.get('total_calories')
     except Exception as e:
         print(f"Error fetching daily activity data: {e}")
         
     return data
 
-# --- REFACTORED CLOUDFLARE D1 CLASS ---
+# --- REFACTORED CLOUDFLARE D1 CLASS (Unchanged) ---
 
 class CloudflareD1:
     def __init__(self, account_id: str, database_id: str, bearer_token: str):
@@ -102,34 +111,22 @@ class CloudflareD1:
         self.headers = {"Authorization": f"Bearer {bearer_token}"}
 
     def upsert_oura_data(self, date: str, data: Dict[str, Any]) -> Optional[Dict]:
-        """
-        Inserts or updates data for a specific date in the oura_data table.
-        This is more flexible and handles partial updates gracefully.
-        """
         if not data:
             print(f"No data provided to upsert for date: {date}")
             return None
-
-        # Filter out keys with None values to avoid overwriting good data with nulls
         valid_data = {k: v for k, v in data.items() if v is not None}
         if not valid_data:
             print(f"All data was None for date: {date}, skipping upsert.")
             return None
-
         columns = ", ".join(valid_data.keys())
         placeholders = ", ".join(["?"] * len(valid_data))
         updates = ", ".join([f"{key} = excluded.{key}" for key in valid_data.keys()])
-        
-        # This SQL command inserts a new row or updates the existing one if the date already exists.
-        # It assumes your 'date' column has a UNIQUE constraint.
         query = f"""
         INSERT INTO oura_data (date, {columns})
         VALUES (?, {placeholders})
         ON CONFLICT(date) DO UPDATE SET {updates};
         """
-        
         params = [date] + list(valid_data.values())
-
         try:
             response = requests.post(self.base_url, headers=self.headers, json={"sql": query, "params": params})
             response.raise_for_status()
@@ -138,10 +135,9 @@ class CloudflareD1:
             print(f"D1 API Error: {e.response.text}")
             raise
 
-# --- REFACTORED MAIN EXECUTION BLOCK ---
+# --- MAIN EXECUTION BLOCK (Now adds 'collected_at') ---
 
 def main():
-    # Load environment variables
     account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
     database_id = os.getenv('CLOUDFLARE_D1_DB')
     bearer_token = os.getenv('CLOUDFLARE_API_TOKEN')
@@ -152,10 +148,6 @@ def main():
 
     d1_client = CloudflareD1(account_id, database_id, bearer_token)
 
-    # Define dates: The script runs today to fetch yesterday's activity and last night's sleep.
-    # When run on July 29th:
-    # today_date = "2025-07-29" (for sleep data from night of 28th->29th)
-    # yesterday_date = "2025-07-28" (for activity data from the 28th)
     today_date_str = datetime.now().date().isoformat()
     yesterday_date_str = (datetime.now().date() - timedelta(days=1)).isoformat()
     
@@ -164,6 +156,7 @@ def main():
     activity_data = fetch_activity_data(oura_token, yesterday_date_str)
     
     if activity_data:
+        activity_data['collected_at'] = datetime.now().isoformat()
         print("Fetched activity data:")
         print(json.dumps(activity_data, indent=2))
         try:
@@ -180,6 +173,7 @@ def main():
     sleep_data = fetch_sleep_data(oura_token, today_date_str)
 
     if sleep_data:
+        sleep_data['collected_at'] = datetime.now().isoformat()
         print("Fetched sleep data:")
         print(json.dumps(sleep_data, indent=2))
         try:
