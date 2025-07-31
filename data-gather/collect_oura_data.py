@@ -1,15 +1,18 @@
-# In file: data-gather/collect_oura_data.py
-
 import os
 import requests
 from datetime import datetime, timedelta, date
 import json
 from typing import Dict, Any, Optional
 
-# NOTE: PyNaCl and the secret update functions are no longer needed
-# but we can leave them in the file without calling them.
+# pynacl is required for automatic secret updates
+try:
+    from nacl.public import PublicKey, SealedBox
+    import base64
+    PYNACL_INSTALLED = True
+except ImportError:
+    PYNACL_INSTALLED = False
 
-# --- HELPER FUNCTIONS FOR OAUTH2 ---
+# --- HELPER FUNCTIONS FOR OAUTH2 & GITHUB ---
 def refresh_oura_token(client_id: str, client_secret: str, refresh_token: str) -> Optional[Dict[str, Any]]:
     print("Refreshing Oura access token...")
     try:
@@ -23,13 +26,36 @@ def refresh_oura_token(client_id: str, client_secret: str, refresh_token: str) -
         print("Successfully refreshed Oura token.")
         return {"access_token": new_tokens.get("access_token"), "refresh_token": new_tokens.get("refresh_token")}
     except requests.exceptions.HTTPError as e:
-        # If the refresh token is invalid, this is where it will fail.
-        print(f"ERROR: Could not refresh Oura token. It might be invalid or expired. {e.response.status_code} - {e.response.text}")
+        print(f"ERROR: Could not refresh Oura token: {e.response.text}")
         return None
+
+def update_github_secret(github_token: str, repo: str, secret_name: str, new_value: str):
+    if not PYNACL_INSTALLED:
+        print("PyNaCl is not installed. Cannot update GitHub secret.")
+        return
+    print(f"Attempting to update GitHub secret: {secret_name}")
+    headers = {"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        key_res = requests.get(f"https://api.github.com/repos/{repo}/actions/secrets/public-key", headers=headers)
+        key_res.raise_for_status()
+        public_key_data = key_res.json()
+        public_key, key_id = public_key_data['key'], public_key_data['key_id']
+        public_key_obj = PublicKey(public_key.encode('utf-8'), base64.Base64Encoder)
+        sealed_box = SealedBox(public_key_obj)
+        encrypted_value = base64.b64encode(sealed_box.encrypt(new_value.encode('utf-8'))).decode('utf-8')
+        update_res = requests.put(
+            f"https://api.github.com/repos/{repo}/actions/secrets/{secret_name}",
+            headers=headers,
+            json={"encrypted_value": encrypted_value, "key_id": key_id}
+        )
+        update_res.raise_for_status()
+        print(f"Successfully updated GitHub secret: {secret_name}")
+    except Exception as e:
+        print(f"Failed to update secret in GitHub API: {e}")
 
 # --- OURA DATA FETCHING & D1 FUNCTIONS (Unchanged) ---
 def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
-    # ... (This function is identical to the one in the previous step) ...
+    # ... (This function is identical to previous versions) ...
     headers = {'Authorization': f'Bearer {token}'}
     data = {}
     try:
@@ -83,7 +109,7 @@ def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
 
 
 def fetch_activity_data(token: str, activity_date: str) -> Dict[str, Any]:
-    # ... (This function is identical to the one in the previous step) ...
+    # ... (This function is identical to previous versions) ...
     headers = {'Authorization': f'Bearer {token}'}
     data = {}
     try:
@@ -105,7 +131,7 @@ def fetch_activity_data(token: str, activity_date: str) -> Dict[str, Any]:
     return data
 
 class CloudflareD1:
-    # ... (This class is identical to the one in the previous step) ...
+    # ... (This class is identical to previous versions) ...
     def __init__(self, account_id: str, database_id: str, bearer_token: str):
         self.base_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query"
         self.headers = {"Authorization": f"Bearer {bearer_token}"}
@@ -129,75 +155,86 @@ class CloudflareD1:
         try:
             response = requests.post(self.base_url, headers=self.headers, json={"sql": query, "params": params})
             response.raise_for_status()
-            print(f"D1 upsert result for {date}:")
-            print(json.dumps(response.json(), indent=2))
             return response.json()
         except requests.exceptions.HTTPError as e:
             print(f"D1 API Error: {e.response.text}")
             raise
 
 
-# --- MAIN EXECUTION BLOCK (MODIFIED FOR MANUAL TOKEN UPDATE) ---
+# --- MAIN EXECUTION BLOCK (AUTOMATIC UPDATES & LOGGING RESTORED) ---
 def main():
-    # --- 1. Load secrets from environment ---
+    # --- 1. Load all secrets from environment ---
     cf_account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
     cf_database_id = os.getenv('CLOUDFLARE_D1_DB')
     cf_api_token = os.getenv('CLOUDFLARE_API_TOKEN')
     oura_client_id = os.getenv('OURA_CLIENT_ID')
     oura_client_secret = os.getenv('OURA_CLIENT_SECRET')
     oura_refresh_token = os.getenv('OURA_REFRESH_TOKEN')
+    github_token = os.getenv('GITHUB_TOKEN')
+    github_repo = os.getenv('GITHUB_REPOSITORY')
     target_date_str = os.getenv('TARGET_DATE')
 
-    if not all([cf_account_id, cf_database_id, cf_api_token, oura_client_id, oura_client_secret, oura_refresh_token]):
-        raise ValueError("One or more required environment variables are missing.")
+    if not all([cf_account_id, cf_database_id, cf_api_token, oura_client_id, oura_client_secret, oura_refresh_token, github_token, github_repo]):
+        raise ValueError("One or more required environment variables for automatic updates are missing.")
 
     # --- 2. Refresh Oura Token ---
     new_tokens = refresh_oura_token(oura_client_id, oura_client_secret, oura_refresh_token)
     if not new_tokens or not new_tokens.get('access_token'):
-        raise RuntimeError("Aborting script.")
+        raise RuntimeError("Aborting script: Could not refresh Oura token.")
     
     access_token = new_tokens['access_token']
     new_refresh_token = new_tokens.get('refresh_token')
 
-    # --- 3. PRINT the new refresh token for manual update ---
-    # This is the critical change for the manual workflow.
+    # --- 3. AUTOMATICALLY update the Refresh Token in GitHub Secrets ---
     if new_refresh_token and new_refresh_token != oura_refresh_token:
-        print("\n" + "="*60)
-        print("!! IMPORTANT: NEW REFRESH TOKEN GENERATED !!")
-        print("You must manually update the OURA_REFRESH_TOKEN secret in GitHub.")
-        print(f"NEW OURA REFRESH TOKEN: {new_refresh_token}")
-        print("="*60 + "\n")
-    else:
-        print("Refresh token was not rotated.")
+        update_github_secret(github_token, github_repo, 'OURA_REFRESH_TOKEN', new_refresh_token)
 
-    # --- 4. Continue with data processing ---
+    # --- 4. Process data ---
     d1_client = CloudflareD1(cf_account_id, cf_database_id, cf_api_token)
 
-    if target_date_str:
-        # MANUAL RUN
-        print(f"--- Manual Run: Fetching all data for {target_date_str} ---")
-        activity_data = fetch_activity_data(access_token, target_date_str)
+    def process_data_for_date(process_date_str, access_token):
+        # Fetch, log, and store activity data
+        activity_data = fetch_activity_data(access_token, process_date_str)
         if activity_data:
-            d1_client.upsert_oura_data(target_date_str, {'collected_at': datetime.now().isoformat(), **activity_data})
+            print(f"Fetched activity data for {process_date_str}:")
+            print(json.dumps(activity_data, indent=2))
+            full_activity_data = {'collected_at': datetime.now().isoformat(), **activity_data}
+            d1_client.upsert_oura_data(process_date_str, full_activity_data)
         
-        sleep_data = fetch_sleep_data(access_token, target_date_str)
+        # Fetch, log, and store sleep data
+        sleep_data = fetch_sleep_data(access_token, process_date_str)
         if sleep_data:
-            d1_client.upsert_oura_data(target_date_str, {'collected_at': datetime.now().isoformat(), **sleep_data})
+            print(f"Fetched sleep data for {process_date_str}:")
+            print(json.dumps(sleep_data, indent=2))
+            full_sleep_data = {'collected_at': datetime.now().isoformat(), **sleep_data}
+            d1_client.upsert_oura_data(process_date_str, full_sleep_data)
+
+    if target_date_str:
+        # MANUAL RUN: Fetch both sleep and activity for the specified date
+        print(f"--- Manual Run: Fetching all data for {target_date_str} ---")
+        process_data_for_date(target_date_str, access_token)
     else:
-        # SCHEDULED RUN
+        # SCHEDULED RUN: Fetch yesterday's activity and today's sleep
         print("--- Scheduled Run ---")
         today = date.today()
         yesterday = today - timedelta(days=1)
         
-        print(f"\n--- Fetching activity data for {yesterday.isoformat()} ---")
+        # Note: Scheduled run gets data for two different days
+        print(f"\n--- Processing yesterday's ({yesterday.isoformat()}) activity ---")
         activity_data = fetch_activity_data(access_token, yesterday.isoformat())
         if activity_data:
-            d1_client.upsert_oura_data(yesterday.isoformat(), {'collected_at': datetime.now().isoformat(), **activity_data})
+            print(f"Fetched activity data for {yesterday.isoformat()}:")
+            print(json.dumps(activity_data, indent=2))
+            full_activity_data = {'collected_at': datetime.now().isoformat(), **activity_data}
+            d1_client.upsert_oura_data(yesterday.isoformat(), full_activity_data)
 
-        print(f"\n--- Fetching sleep data for night ending on {today.isoformat()} ---")
+        print(f"\n--- Processing today's ({today.isoformat()}) sleep ---")
         sleep_data = fetch_sleep_data(access_token, today.isoformat())
         if sleep_data:
-            d1_client.upsert_oura_data(today.isoformat(), {'collected_at': datetime.now().isoformat(), **sleep_data})
+            print(f"Fetched sleep data for {today.isoformat()}:")
+            print(json.dumps(sleep_data, indent=2))
+            full_sleep_data = {'collected_at': datetime.now().isoformat(), **sleep_data}
+            d1_client.upsert_oura_data(today.isoformat(), full_sleep_data)
 
 if __name__ == "__main__":
     main()
