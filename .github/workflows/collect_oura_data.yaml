@@ -10,14 +10,10 @@ on:
         required: false
         default: ''
 
+# No 'permissions' block is needed anywhere in this file.
+
 jobs:
   collect-and-store:
-    # This block is correct according to official GitHub documentation.
-    # It grants the GITHUB_TOKEN the necessary scope to update secrets.
-    permissions:
-      contents: read   # For checking out the repository
-      secrets: write  # For updating the OURA_REFRESH_TOKEN secret
-
     runs-on: ubuntu-latest
     
     steps:
@@ -54,7 +50,8 @@ jobs:
     - name: Update GitHub Secret with new Oura Refresh Token
       if: steps.collection_step.outputs.new_refresh_token != ''
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # <<< CHANGE: Use the new PAT for authentication >>>
+        GH_TOKEN: ${{ secrets.ACTIONS_PAT_FOR_SECRETS }}
         NEW_REFRESH_TOKEN: ${{ steps.collection_step.outputs.new_refresh_token }}
       run: |
         echo "A new Oura refresh token was generated. Updating the GitHub secret..."
