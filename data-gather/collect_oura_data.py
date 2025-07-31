@@ -6,9 +6,8 @@ from datetime import datetime, timedelta, date
 import json
 from typing import Dict, Any, Optional
 
-# --- HELPER FUNCTIONS (UNCHANGED) ---
 def refresh_oura_token(client_id: str, client_secret: str, refresh_token: str) -> Optional[Dict[str, Any]]:
-    # ... (This function remains unchanged) ...
+    """Refreshes the Oura OAuth2 token."""
     print("Refreshing Oura access token...")
     try:
         response = requests.post(
@@ -24,8 +23,11 @@ def refresh_oura_token(client_id: str, client_secret: str, refresh_token: str) -
         print(f"ERROR: Could not refresh Oura token. It might be invalid or expired. {e.response.status_code} - {e.response.text}")
         return None
 
-# --- MODIFIED: Enhanced Logging ---
 def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
+    """
+    Fetches all sleep-related data for a specific night.
+    The 'sleep_date' is the date the sleep period *ends*.
+    """
     headers = {'Authorization': f'Bearer {token}'}
     data = {}
     try:
@@ -83,8 +85,10 @@ def fetch_sleep_data(token: str, sleep_date: str) -> Dict[str, Any]:
         print(f"Error fetching SPO2 data: {e}")
     return data
 
-# --- MODIFIED: Enhanced Logging ---
 def fetch_activity_data(token: str, activity_date: str) -> Dict[str, Any]:
+    """
+    Fetches activity-related data for a specific day.
+    """
     headers = {'Authorization': f'Bearer {token}'}
     data = {}
     try:
@@ -108,7 +112,7 @@ def fetch_activity_data(token: str, activity_date: str) -> Dict[str, Any]:
     return data
 
 class CloudflareD1:
-    # ... (This class remains unchanged) ...
+    """A client to interact with the Cloudflare D1 API."""
     def __init__(self, account_id: str, database_id: str, bearer_token: str):
         self.base_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/query"
         self.headers = {"Authorization": f"Bearer {bearer_token}"}
@@ -121,18 +125,12 @@ class CloudflareD1:
         if not valid_data:
             print(f"All data was None for date: {date}, skipping upsert.")
             return None
-        
         print(f"\n--- Preparing to upsert data for {date} ---")
         print(json.dumps(valid_data, indent=2))
-        
         columns = ", ".join(valid_data.keys())
         placeholders = ", ".join(["?"] * len(valid_data))
         updates = ", ".join([f"{key} = excluded.{key}" for key in valid_data.keys()])
-        query = f"""
-        INSERT INTO oura_data (date, {columns})
-        VALUES (?, {placeholders})
-        ON CONFLICT(date) DO UPDATE SET {updates};
-        """
+        query = f"INSERT INTO oura_data (date, {columns}) VALUES (?, {placeholders}) ON CONFLICT(date) DO UPDATE SET {updates};"
         params = [date] + list(valid_data.values())
         try:
             response = requests.post(self.base_url, headers=self.headers, json={"sql": query, "params": params})
@@ -144,14 +142,13 @@ class CloudflareD1:
             raise
 
 def main():
-    # ... (This function remains unchanged) ...
+    # --- 1. Load secrets and refresh Oura token ---
     cf_account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
     cf_database_id = os.getenv('CLOUDFLARE_D1_DB')
     cf_api_token = os.getenv('CLOUDFLARE_API_TOKEN')
     oura_client_id = os.getenv('OURA_CLIENT_ID')
     oura_client_secret = os.getenv('OURA_CLIENT_SECRET')
     oura_refresh_token = os.getenv('OURA_REFRESH_TOKEN')
-    target_date_str = os.getenv('TARGET_DATE')
 
     if not all([cf_account_id, cf_database_id, cf_api_token, oura_client_id, oura_client_secret, oura_refresh_token]):
         raise ValueError("One or more required environment variables are missing.")
@@ -167,7 +164,6 @@ def main():
         print("\n" + "="*60)
         print("!! NEW REFRESH TOKEN GENERATED !!")
         print("The GitHub Action will attempt to update the secret automatically.")
-        print(f"NEW OURA REFRESH TOKEN: {new_refresh_token}")
         print("="*60 + "\n")
         
         github_output_file = os.getenv('GITHUB_OUTPUT')
@@ -181,32 +177,35 @@ def main():
             with open(github_output_file, 'a') as f:
                 f.write("new_refresh_token=\n")
 
-    d1_client = CloudflareD1(cf_account_id, cf_database_id, cf_api_token)
+    # --- 2. Determine Dates based on run type ---
+    target_date_str = os.getenv('TARGET_DATE')
 
     if target_date_str:
-        print(f"--- Manual Run: Fetching all data for {target_date_str} ---")
-        activity_data = fetch_activity_data(access_token, target_date_str)
-        if activity_data:
-            d1_client.upsert_oura_data(target_date_str, {'collected_at': datetime.now().isoformat(), **activity_data})
-        
-        sleep_data = fetch_sleep_data(access_token, target_date_str)
-        if sleep_data:
-            d1_client.upsert_oura_data(target_date_str, {'collected_at': datetime.now().isoformat(), **sleep_data})
+        print(f"--- Manual run for target date: {target_date_str} ---")
+        sleep_date_obj = datetime.fromisoformat(target_date_str).date()
     else:
-        print("--- Scheduled Run ---")
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        
-        print(f"\n--- Fetching activity data for {yesterday.isoformat()} ---")
-        activity_data = fetch_activity_data(access_token, yesterday.isoformat())
-        if activity_data:
-            d1_client.upsert_oura_data(yesterday.isoformat(), {'collected_at': datetime.now().isoformat(), **activity_data})
+        print(f"--- Scheduled run ---")
+        sleep_date_obj = date.today()
 
-        print(f"\n--- Fetching sleep data for night ending on {today.isoformat()} ---")
-        sleep_data = fetch_sleep_data(access_token, today.isoformat())
-        if sleep_data:
-            d1_client.upsert_oura_data(today.isoformat(), {'collected_at': datetime.now().isoformat(), **sleep_data})
+    activity_date_obj = sleep_date_obj - timedelta(days=1)
+    
+    print(f"Primary sleep date set to: {sleep_date_obj.isoformat()}")
+    print(f"Derived activity date set to: {activity_date_obj.isoformat()}")
 
+    # --- 3. Fetch and Store Data ---
+    d1_client = CloudflareD1(cf_account_id, cf_database_id, cf_api_token)
+
+    # Fetch and write SLEEP data for the primary date
+    print(f"\n--- Fetching sleep data for night ending on {sleep_date_obj.isoformat()} ---")
+    sleep_data = fetch_sleep_data(access_token, sleep_date_obj.isoformat())
+    if sleep_data:
+        d1_client.upsert_oura_data(sleep_date_obj.isoformat(), {'collected_at': datetime.now().isoformat(), **sleep_data})
+
+    # Fetch and write ACTIVITY data for the PREVIOUS day
+    print(f"\n--- Fetching activity data for {activity_date_obj.isoformat()} ---")
+    activity_data = fetch_activity_data(access_token, activity_date_obj.isoformat())
+    if activity_data:
+        d1_client.upsert_oura_data(activity_date_obj.isoformat(), {'collected_at': datetime.now().isoformat(), **activity_data})
 
 if __name__ == "__main__":
     main()
