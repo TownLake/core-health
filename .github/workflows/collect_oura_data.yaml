@@ -10,13 +10,14 @@ on:
         required: false
         default: ''
 
-# Re-adding permissions to allow the script to update secrets
-permissions:
-  contents: read
-  secrets: write
-
 jobs:
   collect-and-store:
+    # This block is correct according to official GitHub documentation.
+    # It grants the GITHUB_TOKEN the necessary scope to update secrets.
+    permissions:
+      contents: read   # For checking out the repository
+      secrets: write  # For updating the OURA_REFRESH_TOKEN secret
+
     runs-on: ubuntu-latest
     
     steps:
@@ -31,9 +32,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pynacl # pynacl is required for automatic updates
+        pip install requests
     
     - name: Run collection script
+      id: collection_step
       env:
         # Cloudflare Secrets
         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -45,10 +47,16 @@ jobs:
         OURA_CLIENT_SECRET: ${{ secrets.OURA_CLIENT_SECRET }}
         OURA_REFRESH_TOKEN: ${{ secrets.OURA_REFRESH_TOKEN }}
         
-        # GitHub context for updating the secret
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-
         # Target date input
         TARGET_DATE: ${{ github.event.inputs.target_date }}
       run: python data-gather/collect_oura_data.py
+
+    - name: Update GitHub Secret with new Oura Refresh Token
+      if: steps.collection_step.outputs.new_refresh_token != ''
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NEW_REFRESH_TOKEN: ${{ steps.collection_step.outputs.new_refresh_token }}
+      run: |
+        echo "A new Oura refresh token was generated. Updating the GitHub secret..."
+        gh secret set OURA_REFRESH_TOKEN --body "$NEW_REFRESH_TOKEN"
+        echo "Secret 'OURA_REFRESH_TOKEN' has been updated."
