@@ -10,10 +10,7 @@ on:
         required: false
         default: ''
 
-# Add this permissions block to allow the script to update secrets
-permissions:
-  contents: read
-  secrets: write
+# NO PERMISSIONS BLOCK NEEDED ANYMORE
 
 jobs:
   collect-and-store:
@@ -21,34 +18,30 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4 # Updated version
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v5 # Updated version
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Specify a version
+        python-version: '3.10'
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pynacl # Installs all required packages
+        pip install requests # pynacl is no longer strictly required
     
     - name: Run collection script
       env:
-        # Cloudflare Secrets (unchanged)
+        # Cloudflare Secrets
         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         CLOUDFLARE_D1_DB: ${{ secrets.CLOUDFLARE_D1_DB }}
         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-        # New Oura OAuth2 Secrets
+        # Oura OAuth2 Secrets
         OURA_CLIENT_ID: ${{ secrets.OURA_CLIENT_ID }}
         OURA_CLIENT_SECRET: ${{ secrets.OURA_CLIENT_SECRET }}
         OURA_REFRESH_TOKEN: ${{ secrets.OURA_REFRESH_TOKEN }}
         
-        # GitHub context for updating the secret
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-
-        # Your original target_date input
+        # Target date input
         TARGET_DATE: ${{ github.event.inputs.target_date }}
       run: python data-gather/collect_oura_data.py
